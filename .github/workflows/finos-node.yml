@@ -9,6 +9,8 @@ permissions:
   contents: write
   packages: write
   id-token: write
+  attestations: write
+  artifact-metadata: write
 
 jobs:
   release:
@@ -36,14 +38,6 @@ jobs:
             echo "tarball=finos-node-$release-linux-amd64.tar.gz"
             echo "sbom=finos-node-$release.cdx.json"
           } >> "$GITHUB_OUTPUT"
-
-      - name: Check that the App gives a token
-        uses: actions/create-github-app-token@v3
-        with:
-          app-id: ${{ secrets.NODE_APP_ID }}
-          private-key: ${{ secrets.NODE_APP_PRIVATE_KEY }}
-          permission-attestations: write
-          permission-artifact-metadata: write
 
       - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f
         with:
@@ -93,34 +87,25 @@ jobs:
           SYFT_FILE_METADATA_SELECTION: none
         run: syft scan "docker:$IMAGE:$RELEASE" --quiet --select-catalogers +sbom-cataloger --output "cyclonedx-json=$SBOM"
 
-      - name: Get the App's token for the attestations
-        id: token
-        uses: actions/create-github-app-token@v3
-        with:
-          app-id: ${{ secrets.NODE_APP_ID }}
-          private-key: ${{ secrets.NODE_APP_PRIVATE_KEY }}
-          permission-attestations: write
-          permission-artifact-metadata: write
-
       - uses: actions/attest@v4
         with:
           subject-name: ${{ steps.release.outputs.image }}
           subject-digest: ${{ steps.push.outputs.digest }}
           sbom-path: ${{ steps.release.outputs.sbom }}
           push-to-registry: true
-          github-token: ${{ steps.token.outputs.token }}
+          github-token: ${{ github.token }}
 
       - uses: actions/attest-build-provenance@v4
         with:
           subject-name: ${{ steps.release.outputs.image }}
           subject-digest: ${{ steps.push.outputs.digest }}
           push-to-registry: true
-          github-token: ${{ steps.token.outputs.token }}
+          github-token: ${{ github.token }}
 
       - uses: actions/attest-build-provenance@v4
         with:
           subject-path: ${{ steps.release.outputs.tarball }}
-          github-token: ${{ steps.token.outputs.token }}
+          github-token: ${{ github.token }}
 
       - name: Publish the release
         env:

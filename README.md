@@ -270,9 +270,9 @@ it does not answer.
   (`frontend-checks.yml`, `backend-checks.yml`, `pr-description.yml`), the end-to-end tests (`e2e.yml`) and the build
   check (`pr-build-check.yml`). The app's settings are defaults in its code.
 
-## Steering and Advisory Committee
+## Advisory Committee
 
-A Steering and Advisory Committee has been formed to ensure the roadmap reflects the needs of buy-side and sell-side institutions. The committee brings together maintainers, global banks, and consultancy partners to guide architectural decisions and open-standards integration. The current members are listed below:
+An Advisory Committee has been formed to ensure the roadmap reflects the needs of buy-side and sell-side institutions. The committee brings together maintainers, global banks, and consultancy partners to guide architectural decisions and open-standards integration. The current members are listed below:
 
 - Alexandru Dumitru, Engineering Lead, Global UI Platform at Citi
 - Kris West, FDC3 Lead Maintainer
@@ -282,7 +282,7 @@ A Steering and Advisory Committee has been formed to ensure the roadmap reflects
 ## Get involved
 
 - Subscribe to the FINOS Workspace mailing list by sending an email to  `workspace-dev+subscribe@lists.finos.org`
-- Intrested in joining the advisory committe? Email [help@finos.org](mailto:help@finos.org) about joining.
+- Intrested in joining the advisory committe? Email [workspace-dev@lists.finos.org](mailto:workspace-dev@lists.finos.org) about joining.
 
 ## License
 

@@ -128,7 +128,7 @@ services:
     build:
       context: ./frontend
       additional_contexts:
-        node: docker-image://ghcr.io/finos-labs/finos-node:26.12.1-1@sha256:ead12e53441802ae738c130ba285e2517e7aa9a39449e9e4fd9bc9bbf03c5352
+        node: docker-image://ghcr.io/finos-labs/finos-node:26.12.1-3@sha256:41118ae12c0c038f04f6ccb2d9d8b4c16a86c1d7cd5bbc5ecd67e6c8f31deece
     platform: ${PLATFORM:-linux/amd64}
     image: workspace-web:local
     restart: unless-stopped
@@ -151,7 +151,7 @@ services:
       context: ./agent
       target: agent
       additional_contexts:
-        node: docker-image://ghcr.io/finos-labs/finos-node:26.12.1-1@sha256:ead12e53441802ae738c130ba285e2517e7aa9a39449e9e4fd9bc9bbf03c5352
+        node: docker-image://ghcr.io/finos-labs/finos-node:26.12.1-3@sha256:41118ae12c0c038f04f6ccb2d9d8b4c16a86c1d7cd5bbc5ecd67e6c8f31deece
     image: workspace-agent:local
     restart: unless-stopped
     init: true
@@ -187,7 +187,7 @@ services:
       context: ./agent
       target: agent-mcp
       additional_contexts:
-        node: docker-image://ghcr.io/finos-labs/finos-node:26.12.1-1@sha256:ead12e53441802ae738c130ba285e2517e7aa9a39449e9e4fd9bc9bbf03c5352
+        node: docker-image://ghcr.io/finos-labs/finos-node:26.12.1-3@sha256:41118ae12c0c038f04f6ccb2d9d8b4c16a86c1d7cd5bbc5ecd67e6c8f31deece
     image: workspace-agent-mcp:local
     restart: unless-stopped
     init: true
