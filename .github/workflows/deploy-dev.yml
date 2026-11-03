@@ -1,0 +1,226 @@
+name: Deploy to dev
+
+on:
+  push:
+    branches:
+      - develop
+    paths:
+      - "backend-api/backend/**"
+      - "frontend/**"
+      - "agent/**"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-dev
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: read
+  id-token: write
+  attestations: write
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  ECR_REGISTRY: ${{ vars.ECR_REGISTRY }}
+  INFRA_REPO: ${{ vars.INFRA_REPO }}
+  VALUES_FILE: ${{ vars.DEV_VALUES_FILE }}
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    env:
+      IMAGE_TAG: dev-${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to AWS to push images
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a
+        with:
+          role-to-assume: ${{ vars.AWS_IMAGE_PUSH_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - uses: aws-actions/amazon-ecr-login@03f1aad4c6c7ffd436567f42f9384779290529bd
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069
+      - uses: crazy-max/ghaction-github-runtime@04d248b84655b509d8c44dc1d6f990c879747487
+
+      - name: Build and push the backend image
+        run: |
+          for image in backend:fastapi.Dockerfile; do
+            repository="finos/${image%%:*}" dockerfile="${image#*:}"
+            if output=$(aws ecr describe-images --repository-name "$repository" --image-ids imageTag="$IMAGE_TAG" 2>&1); then
+              echo "$repository:$IMAGE_TAG is already in ECR."
+            elif grep -q ImageNotFoundException <<< "$output"; then
+              docker buildx build -f "backend-api/backend/$dockerfile" --cache-from "type=gha,scope=$dockerfile" \
+                --cache-to "type=gha,mode=max,scope=$dockerfile" --load -t "$ECR_REGISTRY/$repository:$IMAGE_TAG" backend-api/backend
+              docker push "$ECR_REGISTRY/$repository:$IMAGE_TAG"
+            else
+              echo "$output" >&2
+              exit 1
+            fi
+          done
+
+      - name: SBOM of the backend image
+        continue-on-error: true
+        uses: ./.github/actions/image-sbom
+        with:
+          image: ${{ env.ECR_REGISTRY }}/finos/backend:${{ env.IMAGE_TAG }}
+
+  frontend:
+    needs: node
+    runs-on: ubuntu-latest
+    env:
+      IMAGE_TAG: dev-${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to AWS to push images
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a
+        with:
+          role-to-assume: ${{ vars.AWS_IMAGE_PUSH_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - uses: aws-actions/amazon-ecr-login@03f1aad4c6c7ffd436567f42f9384779290529bd
+
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push the frontend image
+        env:
+          NODE_IMAGE: ${{ needs.node.outputs.image }}
+        run: |
+          if output=$(aws ecr describe-images --repository-name finos/frontend --image-ids imageTag="$IMAGE_TAG" 2>&1); then
+            echo "finos/frontend:$IMAGE_TAG is already in ECR."
+          elif grep -q ImageNotFoundException <<< "$output"; then
+            docker build --build-context "node=docker-image://$NODE_IMAGE" -t "$ECR_REGISTRY/finos/frontend:$IMAGE_TAG" frontend
+            docker push "$ECR_REGISTRY/finos/frontend:$IMAGE_TAG"
+          else
+            echo "$output" >&2
+            exit 1
+          fi
+
+      - name: SBOM of the frontend image
+        continue-on-error: true
+        uses: ./.github/actions/image-sbom
+        with:
+          image: ${{ env.ECR_REGISTRY }}/finos/frontend:${{ env.IMAGE_TAG }}
+          project: frontend
+
+  node:
+    uses: ./.github/workflows/agent-node.yml
+
+  agent:
+    needs: node
+    runs-on: ubuntu-latest
+    env:
+      IMAGE_TAG: dev-${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to AWS to push images
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a
+        with:
+          role-to-assume: ${{ vars.AWS_IMAGE_PUSH_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - uses: aws-actions/amazon-ecr-login@03f1aad4c6c7ffd436567f42f9384779290529bd
+
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push the agent and agent MCP server images
+        env:
+          NODE_IMAGE: ${{ needs.node.outputs.image }}
+        run: |
+          for image in agent:agent agent-mcp:agent-mcp; do
+            repository="finos/${image%%:*}" target="${image#*:}"
+            if output=$(aws ecr describe-images --repository-name "$repository" --image-ids imageTag="$IMAGE_TAG" 2>&1); then
+              echo "$repository:$IMAGE_TAG is already in ECR."
+            elif grep -q ImageNotFoundException <<< "$output"; then
+              docker build --build-context "node=docker-image://$NODE_IMAGE" --target "$target" --build-arg GIT_SHA="$GITHUB_SHA" \
+                -t "$ECR_REGISTRY/$repository:$IMAGE_TAG" agent
+              docker push "$ECR_REGISTRY/$repository:$IMAGE_TAG"
+            else
+              echo "$output" >&2
+              exit 1
+            fi
+          done
+
+      - name: SBOM of the agent image
+        continue-on-error: true
+        uses: ./.github/actions/image-sbom
+        with:
+          image: ${{ env.ECR_REGISTRY }}/finos/agent:${{ env.IMAGE_TAG }}
+
+      - name: SBOM of the agent MCP server image
+        continue-on-error: true
+        uses: ./.github/actions/image-sbom
+        with:
+          image: ${{ env.ECR_REGISTRY }}/finos/agent-mcp:${{ env.IMAGE_TAG }}
+
+  deploy:
+    needs: [backend, frontend, agent]
+    runs-on: ubuntu-latest
+    env:
+      IMAGE_TAG: dev-${{ github.sha }}
+    steps:
+      - name: Name the infrastructure repository and the environment
+        id: infra
+        run: |
+          if [[ $VALUES_FILE != */apps/values.yaml ]]; then
+            echo "::error::DEV_VALUES_FILE must end with /apps/values.yaml: $VALUES_FILE"
+            exit 1
+          fi
+          {
+            echo "owner=${INFRA_REPO%%/*}"
+            echo "name=${INFRA_REPO#*/}"
+            echo "environment=${VALUES_FILE%/apps/values.yaml}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Get a token to read the infrastructure repository
+        id: infra-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.INFRA_APP_ID }}
+          private-key: ${{ secrets.INFRA_APP_PRIVATE_KEY }}
+          owner: ${{ steps.infra.outputs.owner }}
+          repositories: ${{ steps.infra.outputs.name }}
+          permission-contents: read
+
+      - name: Check out the infrastructure repository
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.INFRA_REPO }}
+          token: ${{ steps.infra-token.outputs.token }}
+
+      - name: Read the environment
+        id: env
+        env:
+          ENVIRONMENT: ${{ steps.infra.outputs.environment }}
+        run: grep -v '^#' "$ENVIRONMENT/apps/deploy.env" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to AWS as the deployer
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a
+        with:
+          role-to-assume: ${{ steps.env.outputs.DEPLOYER_ROLE_ARN }}
+          aws-region: ${{ steps.env.outputs.AWS_REGION }}
+
+      - uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4
+        with:
+          version: v4.1.1
+
+      - name: Connect to the cluster
+        run: aws eks update-kubeconfig --name "${{ steps.env.outputs.CLUSTER_NAME }}" --region "${{ steps.env.outputs.AWS_REGION }}"
+
+      - name: Deploy
+        env:
+          ENVIRONMENT: ${{ steps.infra.outputs.environment }}
+          SOURCE: ${{ github.repository }}@${{ github.sha }}
+        run: .github/scripts/deploy-workspace.sh -e "$ENVIRONMENT" -b "$IMAGE_TAG" -f "$IMAGE_TAG" -a "$IMAGE_TAG" -s "$SOURCE"
