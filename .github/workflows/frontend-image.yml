@@ -1,0 +1,107 @@
+name: Frontend Docker Image (ECR)
+
+on:
+  pull_request:
+    branches:
+      - main
+      - develop
+    paths:
+      - "frontend/**"
+      - ".github/workflows/frontend-image.yml"
+  push:
+    tags:
+      - "frontend-v*"
+
+permissions:
+  contents: read
+  packages: read
+  id-token: write
+  attestations: write
+
+concurrency:
+  group: frontend-image-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  node:
+    uses: ./.github/workflows/agent-node.yml
+
+  image:
+    needs: node
+    runs-on: ubuntu-latest
+    env:
+      ECR_REPOSITORY: finos/frontend
+      IMAGE_TAG: pr-${{ github.event.pull_request.number }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Read version
+        if: github.ref_type == 'tag'
+        run: |
+          version="${GITHUB_REF_NAME#frontend-v}"
+          if ! grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' <<< "$version"; then
+            echo "Tag $GITHUB_REF_NAME must look like frontend-vX.Y.Z" >&2
+            exit 1
+          fi
+          git fetch origin main
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "The tagged commit is not on main" >&2
+            exit 1
+          fi
+          echo "IMAGE_TAG=$version" >> "$GITHUB_ENV"
+
+      - name: Configure AWS credentials
+        if: github.ref_type == 'tag'
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a
+        with:
+          role-to-assume: ${{ vars.AWS_IMAGE_PUSH_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        if: github.ref_type == 'tag'
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@03f1aad4c6c7ffd436567f42f9384779290529bd
+
+      - name: Check for an existing image
+        if: github.ref_type == 'tag'
+        id: existing
+        run: |
+          if output=$(aws ecr describe-images --repository-name "$ECR_REPOSITORY" --image-ids imageTag="$IMAGE_TAG" 2>&1); then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          elif grep -q ImageNotFoundException <<< "$output"; then
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "$output" >&2
+            exit 1
+          fi
+
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f
+        if: steps.existing.outputs.exists != 'true'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build image
+        if: steps.existing.outputs.exists != 'true'
+        env:
+          NODE_IMAGE: ${{ needs.node.outputs.image }}
+        run: docker build --build-context "node=docker-image://$NODE_IMAGE" -t "$ECR_REPOSITORY:$IMAGE_TAG" frontend
+
+      - name: Push image
+        if: github.ref_type == 'tag' && steps.existing.outputs.exists != 'true'
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: |
+          docker tag "$ECR_REPOSITORY:$IMAGE_TAG" "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+          docker push "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+
+      - name: SBOM of the image
+        if: github.ref_type == 'tag'
+        uses: ./.github/actions/image-sbom
+        with:
+          image: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
+          project: frontend
