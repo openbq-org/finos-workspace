@@ -24,6 +24,9 @@ import DragFileHere from "./AI/DragFileHere";
 import { useDragAndDropFiles } from "./GridLayout.hooks";
 import Icon from "./Icon";
 
+/** Catalog height of the navigation_bar widget (see widgets.json). */
+const NAVIGATION_BAR_HEIGHT = 2;
+
 function setPointerEvents(removeClass = true) {
   const workarea = document.getElementById("workarea");
   if (!workarea) return;
@@ -74,8 +77,16 @@ export const GridLayout = forwardRef<HTMLDivElement, GridLayoutProps>(
     } = props;
 
     const { width, containerRef } = useContainerWidth();
-    const { currentTab, tabId, layouts, setLayouts, isShared, locked } =
+    const { currentTab, tabId, layouts, setLayouts, isShared, getWidget, locked } =
       useTabContext();
+
+    // The navigation bar is a fixed-height tab strip. Narrow breakpoints force
+    // every item to at least 8 rows, which would otherwise stretch it and get
+    // saved as its height, so always pin it to its catalog height.
+    const isNavigationBar = useCallback(
+      (id: string) => getWidget(id)?.widgetId === "navigation_bar",
+      [getWidget],
+    );
 
     const isMobile = useIsMobile();
 
@@ -104,6 +115,11 @@ export const GridLayout = forwardRef<HTMLDivElement, GridLayoutProps>(
                 Object.entries(item).filter(([, value]) => value !== undefined),
               ) as GridItem;
 
+              if (isNavigationBar(newItem.i)) {
+                newItem.h = NAVIGATION_BAR_HEIGHT;
+                delete newItem.mobileH;
+                return newItem;
+              }
               if (!newItem.minH) newItem.minH = 4;
               if (!newItem.minW) newItem.minW = 8;
               if (isMobile) newItem.mobileH = newItem.h;
@@ -118,7 +134,15 @@ export const GridLayout = forwardRef<HTMLDivElement, GridLayoutProps>(
           setLayouts?.([...layout]);
         }
       },
-      [currentTab, saveTab, tabId, saveToLocalStorage, localStorageKey, isMobile],
+      [
+        currentTab,
+        saveTab,
+        tabId,
+        saveToLocalStorage,
+        localStorageKey,
+        isMobile,
+        isNavigationBar,
+      ],
     );
 
     const debouncedOnLayoutChange = useDebouncedCallback(onLayoutChange, 500, {
@@ -176,14 +200,19 @@ export const GridLayout = forwardRef<HTMLDivElement, GridLayoutProps>(
     }, []);
 
     const layoutsMemo = useMemo(() => {
+      const desktopLayouts = layouts?.map((item) =>
+        isNavigationBar(item.i) ? { ...item, h: NAVIGATION_BAR_HEIGHT } : item,
+      );
       let currentY = 0;
-      const mobileLayouts = layouts?.map((item) => {
+      const mobileLayouts = desktopLayouts?.map((item) => {
         const mobileItem = {
           ...item,
           x: 0,
           w: 40,
           y: currentY,
-          h: Math.max(item.mobileH || item.h, 8),
+          h: isNavigationBar(item.i)
+            ? NAVIGATION_BAR_HEIGHT
+            : Math.max(item.mobileH || item.h, 8),
         };
         currentY += mobileItem.h;
         return mobileItem;
@@ -192,12 +221,12 @@ export const GridLayout = forwardRef<HTMLDivElement, GridLayoutProps>(
       return {
         xxs: mobileLayouts,
         xs: mobileLayouts,
-        sm: layouts,
-        md: layouts,
-        lg: layouts,
-        xl: layouts,
+        sm: desktopLayouts,
+        md: desktopLayouts,
+        lg: desktopLayouts,
+        xl: desktopLayouts,
       };
-    }, [layouts]);
+    }, [layouts, isNavigationBar]);
 
     const childrenMemo = useMemo(() => children, [children]);
     const enableResizing = useMemo(() => !isShared && saveTab, [isShared, saveTab]);
