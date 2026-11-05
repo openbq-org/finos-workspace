@@ -3760,12 +3760,12 @@
       ]
     },
     {
-      "bom-ref": "pkg:npm/workspace-plugin-ag-grid@2.2.1?package-id=5578fbfa8ba3cabc",
+      "bom-ref": "pkg:npm/workspace-plugin-ag-grid@2.3.0?package-id=6da7e9893fc69e5c",
       "type": "library",
       "name": "workspace-plugin-ag-grid",
-      "version": "2.2.1",
-      "cpe": "cpe:2.3:a:workspace-plugin-ag-grid:workspace-plugin-ag-grid:2.2.1:*:*:*:*:*:*:*",
-      "purl": "pkg:npm/workspace-plugin-ag-grid@2.2.1",
+      "version": "2.3.0",
+      "cpe": "cpe:2.3:a:workspace-plugin-ag-grid:workspace-plugin-ag-grid:2.3.0:*:*:*:*:*:*:*",
+      "purl": "pkg:npm/workspace-plugin-ag-grid@2.3.0",
       "properties": [
         {
           "name": "syft:package:foundBy",
@@ -3785,55 +3785,55 @@
         },
         {
           "name": "syft:cpe23",
-          "value": "cpe:2.3:a:workspace-plugin-ag-grid:workspace_plugin_ag_grid:2.2.1:*:*:*:*:*:*:*"
+          "value": "cpe:2.3:a:workspace-plugin-ag-grid:workspace_plugin_ag_grid:2.3.0:*:*:*:*:*:*:*"
         },
         {
           "name": "syft:cpe23",
-          "value": "cpe:2.3:a:workspace_plugin_ag_grid:workspace-plugin-ag-grid:2.2.1:*:*:*:*:*:*:*"
+          "value": "cpe:2.3:a:workspace_plugin_ag_grid:workspace-plugin-ag-grid:2.3.0:*:*:*:*:*:*:*"
         },
         {
           "name": "syft:cpe23",
-          "value": "cpe:2.3:a:workspace_plugin_ag_grid:workspace_plugin_ag_grid:2.2.1:*:*:*:*:*:*:*"
+          "value": "cpe:2.3:a:workspace_plugin_ag_grid:workspace_plugin_ag_grid:2.3.0:*:*:*:*:*:*:*"
         },
         {
           "name": "syft:cpe23",
-          "value": "cpe:2.3:a:workspace-plugin-ag:workspace-plugin-ag-grid:2.2.1:*:*:*:*:*:*:*"
+          "value": "cpe:2.3:a:workspace-plugin-ag:workspace-plugin-ag-grid:2.3.0:*:*:*:*:*:*:*"
         },
         {
           "name": "syft:cpe23",
-          "value": "cpe:2.3:a:workspace-plugin-ag:workspace_plugin_ag_grid:2.2.1:*:*:*:*:*:*:*"
+          "value": "cpe:2.3:a:workspace-plugin-ag:workspace_plugin_ag_grid:2.3.0:*:*:*:*:*:*:*"
         },
         {
           "name": "syft:cpe23",
-          "value": "cpe:2.3:a:workspace_plugin_ag:workspace-plugin-ag-grid:2.2.1:*:*:*:*:*:*:*"
+          "value": "cpe:2.3:a:workspace_plugin_ag:workspace-plugin-ag-grid:2.3.0:*:*:*:*:*:*:*"
         },
         {
           "name": "syft:cpe23",
-          "value": "cpe:2.3:a:workspace_plugin_ag:workspace_plugin_ag_grid:2.2.1:*:*:*:*:*:*:*"
+          "value": "cpe:2.3:a:workspace_plugin_ag:workspace_plugin_ag_grid:2.3.0:*:*:*:*:*:*:*"
         },
         {
           "name": "syft:cpe23",
-          "value": "cpe:2.3:a:workspace-plugin:workspace-plugin-ag-grid:2.2.1:*:*:*:*:*:*:*"
+          "value": "cpe:2.3:a:workspace-plugin:workspace-plugin-ag-grid:2.3.0:*:*:*:*:*:*:*"
         },
         {
           "name": "syft:cpe23",
-          "value": "cpe:2.3:a:workspace-plugin:workspace_plugin_ag_grid:2.2.1:*:*:*:*:*:*:*"
+          "value": "cpe:2.3:a:workspace-plugin:workspace_plugin_ag_grid:2.3.0:*:*:*:*:*:*:*"
         },
         {
           "name": "syft:cpe23",
-          "value": "cpe:2.3:a:workspace_plugin:workspace-plugin-ag-grid:2.2.1:*:*:*:*:*:*:*"
+          "value": "cpe:2.3:a:workspace_plugin:workspace-plugin-ag-grid:2.3.0:*:*:*:*:*:*:*"
         },
         {
           "name": "syft:cpe23",
-          "value": "cpe:2.3:a:workspace_plugin:workspace_plugin_ag_grid:2.2.1:*:*:*:*:*:*:*"
+          "value": "cpe:2.3:a:workspace_plugin:workspace_plugin_ag_grid:2.3.0:*:*:*:*:*:*:*"
         },
         {
           "name": "syft:cpe23",
-          "value": "cpe:2.3:a:workspace:workspace-plugin-ag-grid:2.2.1:*:*:*:*:*:*:*"
+          "value": "cpe:2.3:a:workspace:workspace-plugin-ag-grid:2.3.0:*:*:*:*:*:*:*"
         },
         {
           "name": "syft:cpe23",
-          "value": "cpe:2.3:a:workspace:workspace_plugin_ag_grid:2.2.1:*:*:*:*:*:*:*"
+          "value": "cpe:2.3:a:workspace:workspace_plugin_ag_grid:2.3.0:*:*:*:*:*:*:*"
         },
         {
           "name": "syft:location:0:path",
@@ -4101,7 +4101,7 @@
       ]
     },
     {
-      "ref": "pkg:npm/workspace-plugin-ag-grid@2.2.1?package-id=5578fbfa8ba3cabc",
+      "ref": "pkg:npm/workspace-plugin-ag-grid@2.3.0?package-id=6da7e9893fc69e5c",
       "dependsOn": [
         "pkg:npm/ag-grid-community@32.3.9?package-id=18583a16ab3f813b",
         "pkg:npm/ag-grid-enterprise@32.3.9?package-id=a45b778f7826f912"

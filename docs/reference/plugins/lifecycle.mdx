@@ -52,6 +52,8 @@ The Widgets page in the admin area has three tabs.
 
 On the **Plugin widgets** tab, organization admins manage each plugin that is approved at the deployment. An admin can enable the plugin for the organization and choose which plugin renders a type when two plugins handle it. An admin can also fill in the plugin's settings and narrow what it may do for the organization by removing permissions, frame sources and server hosts. For a plugin with a backend, the admin maps each data source that the backend declares to one of the organization's backends.
 
+An admin can also publish presets of a plugin's widgets for the organization through `GET`, `POST`, `PATCH` and `DELETE` on `/admin/plugins/{plugin_id}/widgets/{widget_id}/presets`, and mark one of them as the organization's default for that widget. Users apply organization presets but only admins change them, and organization presets have no count limit. Each user may keep at most a number of their own presets of each widget, which is 100 unless the admin sets `preset_limit` for the plugin, from 1 to 100000, with `PUT /admin/plugins/{plugin_id}`. Setting it to `null` restores the default. [Presets](module-contract.mdx#presets) describes what a preset holds.
+
 The **Core widgets** tab lists the built-in widget types, which are <PluginList of="builtInTypes" />. It is read-only.
 
 On the **Deployment** tab, superusers see every discovered plugin with its status, its active version and what it asks for. A plugin's page offers these sections:

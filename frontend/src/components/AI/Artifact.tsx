@@ -29,11 +29,13 @@ import {
 import {
   type ArtifactT,
   type ArtifactType,
+  type ArtifactWidgetLink,
   useCopilotStore,
   useShallowCopilotStore,
 } from "~/lib/state/copilot";
 import { createCustomTemplateTab } from "~/lib/utils/createTemplates";
 import { HTML_SANITIZE_CONFIG } from "~/lib/utils/sanitize";
+import { scrollToAndHighlightWidget } from "~/lib/utils/widgetHighlight";
 import { PluginArtifactFrame } from "~/plugins/PluginArtifactFrame";
 import { ConfirmDialog } from "../ds/dialogs/ConfirmDialog";
 import { cn } from "../ds/utils";
@@ -75,6 +77,56 @@ type ArtifactActionsProps = {
   onFullscreen?: () => void;
 };
 
+function ArtifactWidgetLinks({ artifactUuid }: { artifactUuid?: string }) {
+  const links = useShallowCopilotStore((state) =>
+    artifactUuid
+      ? state.chats
+          ?.find((chat) => chat.createdAt === state.currentChat)
+          ?.artifacts?.find((artifact) => artifact.uuid === artifactUuid)?.widgets
+      : undefined,
+  );
+  return links?.length ? <ArtifactWidgetLinkList links={links} /> : null;
+}
+
+function ArtifactWidgetLinkList({ links }: { links: ArtifactWidgetLink[] }) {
+  const navigate = useNavigate();
+  const items = useShallowAppStore((state) => state.items);
+  return (
+    <div
+      className="mr-auto flex min-w-0 flex-wrap items-center gap-x-1.5 body-xs-regular text-ds-text-caption"
+      data-testid="artifact-widget-links"
+    >
+      <span>Added to</span>
+      {links.map((link) => {
+        const dashboard = items?.[link.dashboardId];
+        const widget = dashboard?.data?.widgets?.find((w) => w.id === link.widgetUuid);
+        const label = `${widget?.name ?? link.name}${dashboard?.data?.name ? ` · ${dashboard.data.name}` : ""}`;
+        return (
+          <button
+            key={link.widgetUuid}
+            type="button"
+            className="ws-hyper-link truncate disabled:no-underline disabled:opacity-60"
+            disabled={!widget}
+            onClick={async () => {
+              const copilot = useCopilotStore.getState();
+              if (copilot.isFullscreen) copilot.toggleFullscreen();
+              navigate(
+                `/app/${link.dashboardId}${widget?.innerTab ? `?tab=${widget.innerTab}` : ""}`,
+              );
+              await scrollToAndHighlightWidget(link.widgetUuid, {
+                waitForLayout: true,
+              });
+            }}
+          >
+            {label}
+            {widget ? "" : " (removed)"}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 const ArtifactActions: FC<ArtifactActionsProps> = ({
   onCopy,
   createWidgetParams,
@@ -85,8 +137,23 @@ const ArtifactActions: FC<ArtifactActionsProps> = ({
   createTestId = "create-widget-from-artifact-button",
   onFullscreen,
 }) => {
+  const artifactUuid = createWidgetParams.metadata?.uuid;
+  const create = () =>
+    dispatchCreate(
+      artifactUuid
+        ? {
+            ...createWidgetParams,
+            artifact: {
+              uuid: artifactUuid,
+              name: createWidgetParams.metadata?.name ?? "",
+              chatUuid: useCopilotStore.getState().getCurrentChat()?.uuid ?? "",
+            },
+          }
+        : createWidgetParams,
+    );
   return (
     <div className="flex items-center justify-end gap-1 pt-1.5 pb-0.5 pr-0.5">
+      <ArtifactWidgetLinks artifactUuid={artifactUuid} />
       {onFullscreen && (
         <Tooltip message="View report full screen">
           <button
@@ -113,7 +180,7 @@ const ArtifactActions: FC<ArtifactActionsProps> = ({
       <Tooltip message={createTooltip}>
         <button
           data-testid={createTestId}
-          onClick={() => dispatchCreate(createWidgetParams)}
+          onClick={create}
           className="ws-small-navbar-btn flex items-center justify-center"
         >
           <Icon id="solar-widget-add-outline" className="size-3.5" />

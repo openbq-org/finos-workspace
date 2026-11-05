@@ -1,6 +1,6 @@
 {
   "name": "workspace-plugin-ag-grid",
-  "version": "2.2.1",
+  "version": "2.3.0",
   "private": true,
   "description": "A FINOS Workspace widget plugin with four AgGrid widgets: a table, a live grid on a WebSocket, a server-side table over Postgres and a SQL editor with the result in AgGrid",
   "author": "dlee-bq",

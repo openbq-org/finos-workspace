@@ -168,7 +168,9 @@
           "core:copilot:context",
           "core:clipboard:write",
           "core:download:save",
-          "core:state:write"
+          "core:state:write",
+          "core:ui:button",
+          "core:ui:menu"
         ],
         "model": {
           "traits": {
@@ -207,6 +209,11 @@
                 "title": "AgGrid license key",
                 "description": "AgGrid Enterprise license key for this card. It replaces the organization's key.",
                 "maxLength": 1024
+              },
+              "floatingFilters": {
+                "type": "boolean",
+                "title": "Floating filters",
+                "description": "A filter box under each column header."
               }
             }
           },
@@ -277,7 +284,28 @@
               }
             }
           }
-        }
+        },
+        "actions": [
+          {
+            "id": "floating-filters",
+            "label": "Floating filters",
+            "icon": "filter",
+            "placement": "navbar",
+            "toggles": "floatingFilters"
+          },
+          {
+            "id": "autosize",
+            "label": "Autosize columns",
+            "icon": "assets/autosize.svg",
+            "placement": "menu"
+          },
+          {
+            "id": "clear-filters",
+            "label": "Clear filters and sort",
+            "icon": "refresh",
+            "placement": "menu"
+          }
+        ]
       },
       {
         "id": "livegrid",
@@ -472,7 +500,9 @@
           "core:state:write",
           "core:export:provide",
           "core:copilot:context",
-          "core:params:write"
+          "core:params:write",
+          "core:ui:button",
+          "core:dashboard:add-widget"
         ],
         "server": {
           "routes": [
@@ -563,7 +593,15 @@
               }
             }
           }
-        }
+        },
+        "actions": [
+          {
+            "id": "freeze",
+            "label": "Create static widget",
+            "icon": "table",
+            "placement": "navbar"
+          }
+        ]
       }
     ],
     "skills": [

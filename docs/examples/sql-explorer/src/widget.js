@@ -98,7 +98,7 @@ export function isNumeric(column, value) {
   return typeof value === "number" || NUMERIC_TYPE.test(column?.type ?? "");
 }
 
-export function createWidget({ showGrid } = {}) {
+export function createWidget({ showGrid, onAction } = {}) {
   return {
     initialize() {
       return {
@@ -524,9 +524,15 @@ export function createWidget({ showGrid } = {}) {
         show();
       };
       const onEvent = (message) => {
-        if (message?.kind === "workspace-event" && message.name === "refresh") {
+        if (message?.kind !== "workspace-event") return;
+        if (message.name === "refresh") {
           loadTables();
           execute();
+        }
+        if (message.name === "action" && onAction) {
+          Promise.resolve(onAction(message, { lastRun, invoke: experimental.invoke, signal })).catch((error) => {
+            status.textContent = error?.message ?? String(error);
+          });
         }
       };
       model.on("change:state", onState);

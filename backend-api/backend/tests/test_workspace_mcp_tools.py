@@ -34,14 +34,8 @@ def server(recorded):
 
     async def fake_execute(command):
         recorded.append(command)
-        command_name = (
-            command.get("command")
-            if isinstance(command, dict)
-            else getattr(command, "command", "unknown")
-        )
-        return WorkspaceCommandResult(
-            ok=True, command=command_name, message="ok", data={}
-        )
+        command_name = command.get("command") if isinstance(command, dict) else getattr(command, "command", "unknown")
+        return WorkspaceCommandResult(ok=True, command=command_name, message="ok", data={})
 
     state.execute_command = fake_execute
     return create_mcp_server(state)
@@ -95,9 +89,7 @@ async def test_operation_enums_are_surfaced_in_tool_schemas(server):
 
 async def test_invalid_operation_is_rejected_with_allowed_values(server, recorded):
     async with Client(server) as client:
-        result = await client.call_tool(
-            "manage_dashboard", {"operation": "delete"}, raise_on_error=False
-        )
+        result = await client.call_tool("manage_dashboard", {"operation": "delete"}, raise_on_error=False)
 
     assert result.is_error
     text = result.content[0].text
@@ -114,9 +106,7 @@ async def test_get_widget_schema_and_create_widget_require_origin_and_widget_id(
 
 async def test_create_widget_without_origin_is_rejected_by_schema(server, recorded):
     async with Client(server) as client:
-        result = await client.call_tool(
-            "create_widget", {"widget_id": "w"}, raise_on_error=False
-        )
+        result = await client.call_tool("create_widget", {"widget_id": "w"}, raise_on_error=False)
 
     assert result.is_error
     assert "origin" in result.content[0].text
@@ -132,18 +122,14 @@ async def test_create_widget_without_origin_is_rejected_by_schema(server, record
         ("update_widget_layout", {"x": 0, "y": 0, "w": 10, "h": 5}),
     ],
 )
-async def test_widget_tools_require_an_identifier(
-    server, recorded, tool_name, arguments
-):
+async def test_widget_tools_require_an_identifier(server, recorded, tool_name, arguments):
     async with Client(server) as client:
         result = await client.call_tool(tool_name, arguments, raise_on_error=False)
 
     body = payload(result)
     assert body["ok"] is False
     assert body["error"]["code"] == "invalid_request"
-    assert (
-        f"{tool_name} requires widget_uuid (preferred) or widget_id" in body["message"]
-    )
+    assert f"{tool_name} requires widget_uuid (preferred) or widget_id" in body["message"]
     assert "get_workspace_snapshot.dashboard_composition" in body["message"]
     assert body["error"]["details"] == {"required_one_of": ["widget_uuid", "widget_id"]}
     assert recorded == []
@@ -151,9 +137,7 @@ async def test_widget_tools_require_an_identifier(
 
 async def test_update_widget_requires_data_args_or_ui_args(server, recorded):
     async with Client(server) as client:
-        result = await client.call_tool(
-            "update_widget", {"widget_uuid": "uuid-1"}, raise_on_error=False
-        )
+        result = await client.call_tool("update_widget", {"widget_uuid": "uuid-1"}, raise_on_error=False)
 
     body = payload(result)
     assert body["ok"] is False
@@ -180,9 +164,7 @@ async def test_bridge_warnings_pass_through_verbatim(recorded):
     server = create_mcp_server(state)
 
     async with Client(server) as client:
-        result = await client.call_tool(
-            "manage_dashboard", {"operation": "read"}, raise_on_error=False
-        )
+        result = await client.call_tool("manage_dashboard", {"operation": "read"}, raise_on_error=False)
 
     assert payload(result)["warnings"] == ["dashboard name already in use"]
 
@@ -283,13 +265,9 @@ async def test_manage_dashboard_update_forwards_omitted_dashboard_id(server, rec
     assert command.name == "Renamed"
 
 
-async def test_manage_dashboard_update_without_name_errors_with_context_hint(
-    server, recorded
-):
+async def test_manage_dashboard_update_without_name_errors_with_context_hint(server, recorded):
     async with Client(server) as client:
-        result = await client.call_tool(
-            "manage_dashboard", {"operation": "update"}, raise_on_error=False
-        )
+        result = await client.call_tool("manage_dashboard", {"operation": "update"}, raise_on_error=False)
 
     body = payload(result)
     assert body["ok"] is False
@@ -317,9 +295,7 @@ async def test_browser_unavailable_error_uses_complete_envelope():
     server = create_mcp_server(make_state())
 
     async with Client(server) as client:
-        result = await client.call_tool(
-            "manage_dashboard", {"operation": "read"}, raise_on_error=False
-        )
+        result = await client.call_tool("manage_dashboard", {"operation": "read"}, raise_on_error=False)
 
     body = payload(result)
     assert body["ok"] is False
@@ -347,9 +323,7 @@ async def test_shape_guard_errors_carry_structured_details(server, recorded):
 
 async def test_timeout_error_includes_snapshot_hint():
     state = make_state(command_timeout_seconds=0.05)
-    start = await state.start_session(
-        BrowserSessionStartRequest(client_name="workspace-ui")
-    )
+    start = await state.start_session(BrowserSessionStartRequest(client_name="workspace-ui"))
 
     class Socket:
         async def send_json(self, data: object) -> None:
@@ -372,14 +346,8 @@ async def test_timeout_error_includes_snapshot_hint():
 async def test_not_supported_sentences_present(server):
     tools = {tool.name: tool.description for tool in await server.list_tools()}
 
-    assert (
-        "Dashboard deletion is not available through this MCP surface."
-        in tools["manage_dashboard"]
-    )
-    assert (
-        "There is no app update or delete through this MCP surface."
-        in tools["manage_apps"]
-    )
+    assert "Dashboard deletion is not available through this MCP surface." in tools["manage_dashboard"]
+    assert "There is no app update or delete through this MCP surface." in tools["manage_apps"]
     assert "call get_skill_content with its slug" in tools["get_workspace_snapshot"]
     assert "do not invent them" in tools["assign_tasks_to_agents"]
     assert "one FINOS Workspace data source" in tools["get_widget_data"]
@@ -432,9 +400,7 @@ async def test_small_widget_catalog_passes_through_unchanged():
     server = make_catalog_server(widgets)
 
     async with Client(server) as client:
-        result = await client.call_tool(
-            "list_available_widgets", {}, raise_on_error=False
-        )
+        result = await client.call_tool("list_available_widgets", {}, raise_on_error=False)
 
     body = payload(result)
     assert body["ok"] is True
@@ -449,9 +415,7 @@ async def test_large_widget_catalog_is_offloaded_to_compact_index():
     server = make_catalog_server(widgets)
 
     async with Client(server) as client:
-        result = await client.call_tool(
-            "list_available_widgets", {}, raise_on_error=False
-        )
+        result = await client.call_tool("list_available_widgets", {}, raise_on_error=False)
 
     body = payload(result)
     assert body["ok"] is True
@@ -476,9 +440,7 @@ async def test_large_widget_catalog_is_offloaded_to_compact_index():
         "widget_id": "widget_0",
         "name": "Widget 0",
     }
-    assert all(
-        set(entry) == {"origin", "widget_id", "name"} for entry in data["widgets"]
-    )
+    assert all(set(entry) == {"origin", "widget_id", "name"} for entry in data["widgets"])
     assert f"Full catalog stored at {data['result_ref']}" in body["message"]
     assert "origin or backend_id filter" in body["message"]
     assert "get_widget_schema" in body["message"]
@@ -489,9 +451,7 @@ async def test_offloaded_result_resource_returns_full_original_payload():
     server = make_catalog_server(widgets)
 
     async with Client(server) as client:
-        result = await client.call_tool(
-            "list_available_widgets", {}, raise_on_error=False
-        )
+        result = await client.call_tool("list_available_widgets", {}, raise_on_error=False)
         ref = payload(result)["data"]["result_ref"]
         contents = await client.read_resource(ref)
 
@@ -505,9 +465,7 @@ async def test_offload_store_evicts_oldest_result_after_fifteen(monkeypatch):
     async with Client(server) as client:
         refs = []
         for _ in range(16):
-            result = await client.call_tool(
-                "list_available_widgets", {}, raise_on_error=False
-            )
+            result = await client.call_tool("list_available_widgets", {}, raise_on_error=False)
             refs.append(payload(result)["data"]["result_ref"])
 
         assert len(set(refs)) == 16
@@ -524,11 +482,53 @@ async def test_offload_threshold_env_override_is_respected(monkeypatch):
     server = make_catalog_server(widgets)
 
     async with Client(server) as client:
-        result = await client.call_tool(
-            "list_available_widgets", {}, raise_on_error=False
-        )
+        result = await client.call_tool("list_available_widgets", {}, raise_on_error=False)
 
     data = payload(result)["data"]
     assert data["truncated"] is True
     assert data["widget_count"] == 3
     assert data["result_ref"].startswith(RESULT_REF_PREFIX)
+
+
+def test_the_dashboard_snapshot_keeps_which_widgets_are_static_copies():
+    from workspace_mcp.models import DashboardInfo
+
+    info = DashboardInfo.model_validate(
+        {
+            "id": "d",
+            "name": "Desk",
+            "current_tab_id": "t",
+            "tabs": [
+                {
+                    "tab_id": "t",
+                    "widgets": [
+                        {"widget_uuid": "w1", "name": "Trades SQL"},
+                        {
+                            "widget_uuid": "w2",
+                            "name": "Trades at close",
+                            "copied_from": {
+                                "widget_uuid": "w1",
+                                "name": "Trades SQL",
+                                "created_at": "2026-11-05T14:05:00Z",
+                            },
+                            "from_artifact": {"artifact_uuid": "a1", "name": "Sales", "in_current_chat": True},
+                        },
+                    ],
+                }
+            ],
+        }
+    )
+    source, copy = info.tabs[0].widgets
+    assert source.copied_from is None
+    assert source.from_artifact is None
+    assert copy.copied_from.model_dump() == {
+        "widget_uuid": "w1",
+        "name": "Trades SQL",
+        "created_at": "2026-11-05T14:05:00Z",
+    }
+    assert copy.from_artifact.model_dump() == {
+        "artifact_uuid": "a1",
+        "name": "Sales",
+        "created_at": None,
+        "in_current_chat": True,
+    }

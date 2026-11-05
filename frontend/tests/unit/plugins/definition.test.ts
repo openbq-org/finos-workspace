@@ -72,6 +72,27 @@ describe("a widget's data.<type> against its plugin's definition", () => {
     );
   });
 
+  it("matches only the schema's own keys, never inherited names", () => {
+    const closed = {
+      type: "object",
+      additionalProperties: false,
+      required: ["constructor"],
+      properties: { rows: { type: "array" }, constructor: { type: "string" } },
+    };
+    const withProto = structuredClone(
+      JSON.parse('{"rows":[],"constructor":"x","__proto__":"anything"}'),
+    );
+    expect(validateDefinition(withProto, closed)).toEqual([
+      { path: "/__proto__", message: "is not a defined key" },
+    ]);
+    expect(validateDefinition({ rows: [] }, closed)).toEqual([
+      { path: "/constructor", message: "is required" },
+    ]);
+    expect(
+      validateDefinition("x", { $ref: "#/$defs/__proto__", $defs: {} }).length,
+    ).toBeGreaterThan(0);
+  });
+
   it("refuses a configuration when the plugin takes none", () => {
     expect(validateDefinition(undefined, null)).toEqual([]);
     expect(validateDefinition({ a: 1 }, null)).toHaveLength(1);

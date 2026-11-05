@@ -55,6 +55,12 @@ export function errorText(error: unknown): string {
   const detail = (error as { response?: { data?: { detail?: unknown } } })?.response
     ?.data?.detail;
   if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) {
+    return detail
+      .map((item) => (item as { msg?: unknown })?.msg)
+      .filter((msg) => typeof msg === "string")
+      .join("; ");
+  }
   if (detail && typeof detail === "object") {
     const { message, errors, missing } = detail as {
       message?: string;

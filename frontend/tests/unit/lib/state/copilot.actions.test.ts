@@ -834,3 +834,49 @@ describe("useCopilotStore - Actions", () => {
     });
   });
 });
+
+describe("recordArtifactWidget", () => {
+  const link = {
+    widgetUuid: "w-1",
+    dashboardId: "d-1",
+    name: "Sales bars",
+    createdAt: "2026-11-05T10:00:00.000Z",
+  };
+  const artifact = { uuid: "a-1", type: "text", content: "x" } as ArtifactT;
+  const chat = {
+    uuid: "c-1",
+    createdAt: 1,
+    label: "",
+    messages: [],
+    artifacts: [artifact],
+  } as unknown as Chat;
+
+  beforeEach(() => {
+    useCopilotStore.setState({ chats: [chat], currentChat: 1 } as never);
+  });
+
+  it("adds the widget to the artifact with new objects, so the chat sync sees the change", () => {
+    useCopilotStore.getState().recordArtifactWidget("c-1", "a-1", link);
+    const [next] = useCopilotStore.getState().chats;
+    expect(next).not.toBe(chat);
+    expect(next.artifacts?.[0]).not.toBe(artifact);
+    expect(next.artifacts?.[0].widgets).toEqual([link]);
+    expect(artifact.widgets).toBeUndefined();
+  });
+
+  it("keeps one entry per widget", () => {
+    const { recordArtifactWidget } = useCopilotStore.getState();
+    recordArtifactWidget("c-1", "a-1", link);
+    recordArtifactWidget("c-1", "a-1", { ...link, name: "Renamed" });
+    expect(useCopilotStore.getState().chats[0].artifacts?.[0].widgets).toEqual([
+      { ...link, name: "Renamed" },
+    ]);
+  });
+
+  it("leaves the chats alone for an unknown chat or artifact", () => {
+    const { recordArtifactWidget } = useCopilotStore.getState();
+    recordArtifactWidget("other", "a-1", link);
+    recordArtifactWidget("c-1", "other", link);
+    expect(useCopilotStore.getState().chats[0]).toBe(chat);
+  });
+});

@@ -228,6 +228,17 @@ const WorkspaceStateSchema = z.object({
       widgets: z.array(z.object({
         widget_uuid: z.string(),
         name: z.string().optional(),
+        copied_from: z.object({
+          widget_uuid: z.string(),
+          name: z.string(),
+          created_at: z.string().optional(),
+        }).optional(),
+        from_artifact: z.object({
+          artifact_uuid: z.string(),
+          name: z.string(),
+          created_at: z.string().optional(),
+          in_current_chat: z.boolean().optional(),
+        }).optional(),
       })).optional(),
     })).optional(),
   }).nullish(),

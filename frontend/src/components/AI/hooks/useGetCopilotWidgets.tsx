@@ -116,6 +116,7 @@ export function useGetCopilotWidgets() {
     externalCopilotHolders,
     actionHistory,
     chatMessages,
+    getCurrentChatArtifacts,
   } = useShallowCopilotStore((s) => ({
     selectedCopilot: s.selectedCopilot,
     chatMessages: s.getCurrentChat()?.messages,
@@ -337,7 +338,11 @@ export function useGetCopilotWidgets() {
     let currentDashboardInfo = null as DashboardInfoT;
     const currentDashboard = getSideBarItem(currentDashboardId);
     if (pageContext === "dashboard" && currentDashboard?.data) {
-      currentDashboardInfo = getDashboardInfo(currentDashboardId, innerTab);
+      currentDashboardInfo = getDashboardInfo(
+        currentDashboardId,
+        innerTab,
+        new Set((getCurrentChatArtifacts?.() ?? []).map((artifact) => artifact.uuid)),
+      );
     }
 
     result.workspaceState.current_dashboard_info = currentDashboardInfo;

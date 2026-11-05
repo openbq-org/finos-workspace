@@ -89,7 +89,8 @@ The `contributes.widgets` list holds one entry for each widget type that the plu
   "model": { "traits": {} },
   "params": [],
   "settings": { "schema": {}, "defaults": {} },
-  "grid": { "w": 20, "h": 12 }
+  "grid": { "w": 20, "h": 12 },
+  "actions": [{ "id": "freeze", "label": "Create static widget", "icon": "table", "placement": "navbar" }]
 }
 ```
 
@@ -98,6 +99,18 @@ The `contributes.widgets` list holds one entry for each widget type that the plu
 An entry of `handles` has these properties:
 
 <SchemaTable set="manifest" name="Handle" schemaPage="/reference/schemas/plugin-json" />
+
+### Actions
+
+A widget can put buttons in its card's header and items in the card's options menu. It declares each of them in `actions`:
+
+<SchemaTable set="manifest" name="Action" schemaPage="/reference/schemas/plugin-json" />
+
+The host draws every action with its own button or menu item, so the plugin chooses only the text and the icon. The icon is one of the host's icons <PluginList of="actionIcons" or />, or an SVG file of the package directly under `assets/`, such as `assets/autosize.svg`. An SVG icon is at most 16 KiB and holds only the elements <PluginList of="actionIconTags" /> with the attributes <PluginList of="actionIconAttributes" />. Each attribute's value must fit a fixed pattern (numbers, path data, `none`, `currentColor`, a color name or a hex color, and transform functions), so an icon has no ids, no references and no CSS. It has no DOCTYPE or entity. A version whose icon breaks these rules is blocked when it is scanned. The host checks the file against the approved version, sanitizes it again before it draws it inline in the card, and drops anything outside these rules, so an icon cannot run a script, load a resource or style the page. Draw the icon with `currentColor` so that it follows the site's light or dark mode. A widget with navbar buttons has the permission `core:ui:button`, and a widget with menu items has `core:ui:menu`, and only then. A widget has at most <PluginValue of="limits.MAX_NAVBAR_ACTIONS" /> buttons and <PluginValue of="limits.MAX_MENU_ACTIONS" /> menu items. When an admin removes one of the permissions, its actions leave the card.
+
+When the user picks an action, the module receives `{ kind: "workspace-event", name: "action", id }` on `msg:custom`. A button that `toggles` a boolean setting works like the card's raw-data button: the host switches the setting, saves it with the dashboard and shows the button as pressed while the setting is on, and the event carries `pressed`. The module reads the setting through its `config` trait, so it needs no write permission for it. On a shared dashboard the toggle is disabled, and every other action still reaches the module.
+
+An action can turn the widget's current state into a widget of its own. With the permission `core:dashboard:add-widget`, right after the user picks an action, the module may add one of its plugin's widgets that declares an `artifact`, holding data that satisfies the artifact's schema. The new widget is standalone and has no parameters, like an artifact that the user adds from the chat. A widget with this permission also has an action that toggles nothing, since a toggle never lets it add a widget, and its plugin has a widget with an `artifact`. [Plugin permissions and commands](commands-and-permissions.mdx) describes the command.
 
 The id of a widget matches <PluginValue of="patterns.widgetId" />, and a viz type matches <PluginValue of="patterns.vizType" />. A viz type cannot be one of the built-in types <PluginList of="builtInTypes" />. One plugin cannot handle the same type twice. When two plugins handle a type, the organization's admin chooses which of them renders it.
 
@@ -154,7 +167,7 @@ A widget with `artifact` is a component the agent can use in the chat: it shows 
 | `description` | At most 300 characters. Tells the agent when the component fits the question. |
 | `data` | The JSON Schema of the data the agent gives, in the form of a `definition` (below): an object, closed and bounded. The agent reads it to build the data, the agent drops what it does not name, and data over 256 KiB is refused. |
 
-Nobody who wrote the data themed it: the widget follows the `theme` trait for what the data leaves open. The widget reads the data through its `data` trait, so it needs the permission `core:data:read` and, when it declares `model.traits`, a trait bound to `data`, as [Plugin module contract](module-contract.mdx) describes. Its `settings` are the agent's `config`. In the chat the widget runs with `core:data:read`, `core:ui:notify`, `core:clipboard:write`, `core:backend:call`, `core:state:write` and `core:asset:read`, with its state kept in the card; a proxy, a write to params, a link or a download work once the widget is on a dashboard. A widget on a dashboard made from an artifact has no endpoint, so its `data` trait is the data it was made with.
+Nobody who wrote the data themed it: the widget follows the `theme` trait for what the data leaves open. The widget reads the data through its `data` trait, so it needs the permission `core:data:read` and, when it declares `model.traits`, a trait bound to `data`, as [Plugin module contract](module-contract.mdx) describes. Its `settings` are the agent's `config`. In the chat the widget runs with `core:data:read`, `core:ui:notify`, `core:clipboard:write`, `core:backend:call`, `core:state:write` and `core:asset:read`, with its state kept in the card; a proxy, a write to params or config, a link or a download work once the widget is on a dashboard. A widget on a dashboard made from an artifact has no endpoint, so its `data` trait is the data it was made with.
 
 The artifact is part of the version the reviewer approves: the review lists it, and a change to its description or its data schema is asked for again. Only users whose roles grant the widget are offered it, and the agent is told of the components of the plugins that are approved and enabled for the user's organization. The artifact travels to the browser as an artifact of the `plugin` type, as [Agent query protocol](../protocols/agent-query.mdx#artifacts) describes.
 

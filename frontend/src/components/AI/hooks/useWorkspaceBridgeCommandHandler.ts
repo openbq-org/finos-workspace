@@ -1193,6 +1193,9 @@ async function handleWidgetCommand(
         const updatedWidget = useAppStore
           .getState()
           .getTabWidgetById(dashboardId, widgetUuid);
+        const effectiveConfig = updatedWidget
+          ? workspaceApi.pluginConfig(updatedWidget)
+          : undefined;
         return successResult(
           "Widget updated.",
           {
@@ -1202,6 +1205,9 @@ async function handleWidgetCommand(
               string,
               unknown
             >,
+            ...(effectiveConfig
+              ? { effective_ui_args: { config: effectiveConfig } }
+              : {}),
           },
           widgetConfigWarnings(updatedWidget?.params, command.config),
         );

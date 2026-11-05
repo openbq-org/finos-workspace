@@ -178,12 +178,13 @@ export const GridLayout = forwardRef<HTMLDivElement, GridLayoutProps>(
     const layoutsMemo = useMemo(() => {
       let currentY = 0;
       const mobileLayouts = layouts?.map((item) => {
+        const mobileH = Math.max(item.mobileH || item.h, 8);
         const mobileItem = {
           ...item,
           x: 0,
           w: 40,
           y: currentY,
-          h: Math.max(item.mobileH || item.h, 8),
+          h: item.maxH ? Math.min(mobileH, item.maxH) : mobileH,
         };
         currentY += mobileItem.h;
         return mobileItem;

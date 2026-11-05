@@ -85,9 +85,7 @@ def merge_mcp_server_headers(
     return merged
 
 
-async def save_mcp_servers(
-    db: AsyncSession, user_uuid: UUID, servers: list[schemas.MCPServer]
-) -> None:
+async def save_mcp_servers(db: AsyncSession, user_uuid: UUID, servers: list[schemas.MCPServer]) -> None:
     row = (
         await db.execute(
             select(models.MCPServers.uuid, models.MCPServers.headers)
@@ -97,23 +95,16 @@ async def save_mcp_servers(
     ).first()
     values = {
         "servers": [server.stored_fields() for server in servers],
-        "headers": merge_mcp_server_headers(row.headers or {} if row else {}, servers)
-        or None,
+        "headers": merge_mcp_server_headers(row.headers or {} if row else {}, servers) or None,
     }
     if row is None:
         await db.execute(insert(models.MCPServers).values(user_uuid=user_uuid, **values))
     else:
-        await db.execute(
-            update(models.MCPServers)
-            .where(models.MCPServers.user_uuid == user_uuid)
-            .values(**values)
-        )
+        await db.execute(update(models.MCPServers).where(models.MCPServers.user_uuid == user_uuid).values(**values))
     await db.commit()
 
 
-async def get_mcp_server_headers(
-    db: AsyncSession, user_uuid: UUID, url: str
-) -> dict[str, str] | None:
+async def get_mcp_server_headers(db: AsyncSession, user_uuid: UUID, url: str) -> dict[str, str] | None:
     row = (
         await db.execute(
             select(models.MCPServers.servers, models.MCPServers.headers)
@@ -124,16 +115,12 @@ async def get_mcp_server_headers(
     if row is None:
         return None
     target = schemas.normalize_mcp_url(url)
-    if not any(
-        schemas.normalize_mcp_url(server["url"]) == target for server in row.servers or []
-    ):
+    if not any(schemas.normalize_mcp_url(server["url"]) == target for server in row.servers or []):
         return None
     return dict((row.headers or {}).get(target) or {})
 
 
-async def get_copilot_key_status(
-    db: AsyncSession, user_uuid: UUID
-) -> schemas.CopilotKeysStatus:
+async def get_copilot_key_status(db: AsyncSession, user_uuid: UUID) -> schemas.CopilotKeysStatus:
     row = (
         await db.execute(
             select(
@@ -150,37 +137,25 @@ async def get_copilot_key_status(
     )
 
 
-async def get_copilot_provider_keys(
-    db: AsyncSession, user_uuid: UUID
-) -> schemas.CopilotProviderKeys:
+async def get_copilot_provider_keys(db: AsyncSession, user_uuid: UUID) -> schemas.CopilotProviderKeys:
     row = (
         await db.execute(
-            select(models.User.openai_api_key, models.User.perplexity_api_key).where(
-                models.User.uuid == user_uuid
-            )
+            select(models.User.openai_api_key, models.User.perplexity_api_key).where(models.User.uuid == user_uuid)
         )
     ).first()
     if row is None:
         return schemas.CopilotProviderKeys()
-    return schemas.CopilotProviderKeys(
-        openai_api_key=row.openai_api_key, perplexity_api_key=row.perplexity_api_key
-    )
+    return schemas.CopilotProviderKeys(openai_api_key=row.openai_api_key, perplexity_api_key=row.perplexity_api_key)
 
 
-async def set_copilot_provider_keys(
-    db: AsyncSession, user_uuid: UUID, keys: schemas.CopilotProviderKeys
-) -> None:
+async def set_copilot_provider_keys(db: AsyncSession, user_uuid: UUID, keys: schemas.CopilotProviderKeys) -> None:
     values = {name: getattr(keys, name) for name in keys.model_fields_set}
     if values:
-        await db.execute(
-            update(models.User).where(models.User.uuid == user_uuid).values(**values)
-        )
+        await db.execute(update(models.User).where(models.User.uuid == user_uuid).values(**values))
         await db.commit()
 
 
-async def get_copilot_chats(
-    db: AsyncSession, user_uuid: UUID
-) -> list[schemas.ChatInfo | schemas.Chat]:
+async def get_copilot_chats(db: AsyncSession, user_uuid: UUID) -> list[schemas.ChatInfo | schemas.Chat]:
 
     last_opened_query = (
         select(models.CopilotChat)
@@ -207,9 +182,7 @@ async def get_copilot_chats(
 
     async for v in (await db.stream(query)).mappings():
         row = CustomRow(**v)
-        chats.append(
-            schemas.Chat.from_row(last_opened if row.uuid == latest_uuid else row)
-        )
+        chats.append(schemas.Chat.from_row(last_opened if row.uuid == latest_uuid else row))
 
     return chats or schemas.default_chats()
 
@@ -228,14 +201,8 @@ async def get_user_questions_history(db: AsyncSession, user_uuid: UUID) -> list[
     return (await db.execute(query)).scalars().all()
 
 
-async def get_stored_theme_settings(
-    db: AsyncSession, entity_uuid: UUID
-) -> models.EntityThemeSettings | None:
-    query = (
-        select(models.EntityThemeSettings)
-        .where(models.EntityThemeSettings.entity_uuid == entity_uuid)
-        .limit(1)
-    )
+async def get_stored_theme_settings(db: AsyncSession, entity_uuid: UUID) -> models.EntityThemeSettings | None:
+    query = select(models.EntityThemeSettings).where(models.EntityThemeSettings.entity_uuid == entity_uuid).limit(1)
     return (await db.execute(query)).scalar_one_or_none()
 
 
@@ -249,9 +216,7 @@ async def get_entity_theme_settings(db: AsyncSession, entity_uuid: UUID):
     active = str(result.get("active_preset") or "")
     for preset in result.get("presets", []):
         if str(preset.get("uuid")) == active:
-            settings.properties = schemas.ThemeVariants.model_validate(
-                {"light": preset["light"], "dark": preset["dark"]}
-            )
+            settings.properties = schemas.ThemeVariants.model_validate({"light": preset["light"], "dark": preset["dark"]})
     return settings
 
 
@@ -268,9 +233,7 @@ async def save_stored_theme_settings(
     await db.commit()
 
 
-async def user_app_task(
-    type: Literal["owned", "shared"], user_uuid: UUID
-) -> crud.UserApps:
+async def user_app_task(type: Literal["owned", "shared"], user_uuid: UUID) -> crud.UserApps:
     start_time = time()
     try:
         async with database.AsyncReadSessionLocal.session() as session:
@@ -312,9 +275,7 @@ async def dashboard_task(
             if type == "shared":
                 return await crud.get_user_dashboards_shared(session, user_uuid)
             if type == "entity_shared":
-                return await crud.get_user_dashboards_entity_shared(
-                    session, user_uuid, permissions_uuid
-                )
+                return await crud.get_user_dashboards_entity_shared(session, user_uuid, permissions_uuid)
     except Exception as e:
         logger.exception(e)
     finally:
@@ -329,9 +290,7 @@ async def get_dashboards_complete(user: models.User) -> schemas.DashboardComplet
     tasks: list[asyncio.Task[crud.UserDashboards]] = [
         asyncio.create_task(dashboard_task("owned", user.uuid)),
         asyncio.create_task(dashboard_task("shared", user.uuid)),
-        asyncio.create_task(
-            dashboard_task("entity_shared", user.uuid, user.permissions_uuid)
-        ),
+        asyncio.create_task(dashboard_task("entity_shared", user.uuid, user.permissions_uuid)),
     ]
 
     owned, shared, entity_shared = await asyncio.gather(*tasks)
@@ -348,9 +307,7 @@ def check_login(user: schemas.UserLogin, db_user: schemas.AppUserSchema | None):
             detail="The provided credentials do not match any registered user account.",
         )
 
-    if not user._bypass_password_check and not base.verify_password(
-        user.password, db_user.password
-    ):
+    if not user._bypass_password_check and not base.verify_password(user.password, db_user.password):
         raise EXCEPTION_401
 
 
@@ -384,9 +341,7 @@ async def get_entity_users(db: AsyncSession, entity_uuid: UUID):
             models.PermissionsEntityMap,
             models.PermissionsEntityMap.uuid == models.User.permissions_uuid,
         )
-        .join(
-            models.Entity, models.Entity.uuid == models.PermissionsEntityMap.entity_uuid
-        )
+        .join(models.Entity, models.Entity.uuid == models.PermissionsEntityMap.entity_uuid)
         .where(models.Entity.uuid == entity_uuid)
     )
     return (await db.execute(query)).scalars().all()
@@ -441,6 +396,21 @@ async def get_backend_mcp_grants(db: AsyncSession, user_uuid: UUID) -> list[sche
     return [schemas.McpGrant.model_construct(server_url=url, tool_name=schemas.ALL_MCP_TOOLS) for url in sorted(urls)]
 
 
+async def get_own_mcp_grants(db: AsyncSession, user_uuid: UUID) -> list[schemas.McpGrant]:
+    if not await may_add_connections(db, user_uuid):
+        return []
+    servers = (
+        await db.execute(select(models.MCPServers.servers).where(models.MCPServers.user_uuid == user_uuid).limit(1))
+    ).scalar_one_or_none()
+    defaults = {schemas.mcp_host_and_port(server.url) for server in settings.DEFAULT_MCP_SERVERS}
+    urls = {
+        schemas.normalize_mcp_url(server["url"])
+        for server in servers or []
+        if schemas.mcp_host_and_port(server["url"]) not in defaults
+    }
+    return [schemas.McpGrant.model_construct(server_url=url, tool_name=schemas.ALL_MCP_TOOLS) for url in sorted(urls)]
+
+
 async def shares_need_approval(db: AsyncSession, user_uuid: UUID) -> bool:
     return await get_user_type(db, user_uuid) == models.DEVELOPER_TYPE
 
@@ -472,9 +442,7 @@ async def get_user_access(db: AsyncSession, user_uuid: UUID) -> schemas.UserAcce
 
 async def get_user_limits(db: AsyncSession, user_uuid: UUID) -> schemas.UserLimits:
     if await get_user_type(db, user_uuid) == models.DEVELOPER_TYPE:
-        return schemas.UserLimits(
-            copilot_calls_day=None, copilot_tokens_day=None, upload_size_gb=None
-        )
+        return schemas.UserLimits(copilot_calls_day=None, copilot_tokens_day=None, upload_size_gb=None)
 
     roles = (
         await db.execute(
@@ -533,14 +501,10 @@ async def check_usage_cache(db: AsyncSession, user: models.User) -> schemas.Usag
 async def _create_usage(user: models.User, db: AsyncSession) -> schemas.UsageGet:
     limits = await get_user_limits(db, user.uuid)
 
-    select_query = select(func.sum(models.StoredFile.size)).where(
-        models.StoredFile.creater_uuid == user.uuid
-    )
+    select_query = select(func.sum(models.StoredFile.size)).where(models.StoredFile.creater_uuid == user.uuid)
     total_file_bytes = (await db.execute(select_query)).scalar_one_or_none()
 
-    total_file_upload_size_gb_count = (
-        (total_file_bytes / (1024**3)) if total_file_bytes else 0
-    )
+    total_file_upload_size_gb_count = (total_file_bytes / (1024**3)) if total_file_bytes else 0
 
     usage = models.UserUsage(
         user_uuid=user.uuid,
@@ -591,14 +555,10 @@ async def get_widget_metadata(
             query = query.where(models.WidgetMetadata.name == name)
 
     result = (await db.execute(query)).all()
-    return [
-        schemas.WidgetMetadataResponse.model_validate(item._asdict()) for item in result
-    ]
+    return [schemas.WidgetMetadataResponse.model_validate(item._asdict()) for item in result]
 
 
-async def _get_user_entity_info(
-    db: AsyncSession, user_uuid: UUID
-) -> schemas.UserEntityInfo:
+async def _get_user_entity_info(db: AsyncSession, user_uuid: UUID) -> schemas.UserEntityInfo:
     query = (
         select(models.Entity.name, models.PermissionsEntityMap.name.label("permission"))
         .select_from(models.User)
@@ -607,14 +567,10 @@ async def _get_user_entity_info(
             models.PermissionsEntityMap,
             models.PermissionsEntityMap.uuid == models.User.permissions_uuid,
         )
-        .outerjoin(
-            models.Entity, models.Entity.uuid == models.PermissionsEntityMap.entity_uuid
-        )
+        .outerjoin(models.Entity, models.Entity.uuid == models.PermissionsEntityMap.entity_uuid)
     )
     result = (await db.execute(query)).first()
-    return schemas.UserEntityInfo(
-        entity_name=result.name, permission_name=result.permission
-    )
+    return schemas.UserEntityInfo(entity_name=result.name, permission_name=result.permission)
 
 
 async def delete_user(db: AsyncSession, user_uuid: UUID) -> bool:
@@ -648,22 +604,14 @@ async def delete_user(db: AsyncSession, user_uuid: UUID) -> bool:
     return response.rowcount == 1
 
 
-def replace_headers(
-    stored: dict[str, str] | None, incoming: dict[str, str] | None
-) -> dict[str, str]:
+def replace_headers(stored: dict[str, str] | None, incoming: dict[str, str] | None) -> dict[str, str]:
     if incoming is None:
         return dict(stored or {})
     kept = {name.lower(): value for name, value in (stored or {}).items()}
-    return {
-        name: value or kept[name.lower()]
-        for name, value in incoming.items()
-        if value or name.lower() in kept
-    }
+    return {name: value or kept[name.lower()] for name, value in incoming.items() if value or name.lower() in kept}
 
 
-async def insert_or_update_custom_copilot(
-    db: AsyncSession, user_uuid: UUID, custom_copilot: schemas.CustomCopilot
-):
+async def insert_or_update_custom_copilot(db: AsyncSession, user_uuid: UUID, custom_copilot: schemas.CustomCopilot):
     stored = (
         await db.execute(
             select(models.CustomCopilot.url, models.CustomCopilot.headers).where(
@@ -698,14 +646,10 @@ async def insert_or_update_custom_copilot(
     await db.commit()
 
 
-async def get_custom_copilots(
-    db: AsyncSession, user_uuid: UUID
-) -> list[schemas.CustomCopilot]:
+async def get_custom_copilots(db: AsyncSession, user_uuid: UUID) -> list[schemas.CustomCopilot]:
     if not await may_add_connections(db, user_uuid):
         return []
-    query = select(models.CustomCopilot).where(
-        models.CustomCopilot.user_uuid == user_uuid
-    )
+    query = select(models.CustomCopilot).where(models.CustomCopilot.user_uuid == user_uuid)
     result = await db.execute(query)
     return [
         schemas.CustomCopilot(
@@ -718,9 +662,7 @@ async def get_custom_copilots(
     ]
 
 
-async def get_custom_copilot_connection(
-    db: AsyncSession, user_uuid: UUID, copilot_uuid: UUID
-) -> SimpleNamespace | None:
+async def get_custom_copilot_connection(db: AsyncSession, user_uuid: UUID, copilot_uuid: UUID) -> SimpleNamespace | None:
     if not await may_add_connections(db, user_uuid):
         return None
     row = (
@@ -746,9 +688,7 @@ def agent_connection(
     )
 
 
-async def delete_custom_copilot(
-    db: AsyncSession, user_uuid: UUID, uuid: str | None = None
-):
+async def delete_custom_copilot(db: AsyncSession, user_uuid: UUID, uuid: str | None = None):
     delete_stmt = delete(models.CustomCopilot).where(
         models.CustomCopilot.user_uuid == user_uuid,
     )
@@ -758,9 +698,7 @@ async def delete_custom_copilot(
     await db.commit()
 
 
-async def insert_user_prompt_state(
-    db: AsyncSession, user_uuid: UUID, prompts: list[schemas.Prompt]
-):
+async def insert_user_prompt_state(db: AsyncSession, user_uuid: UUID, prompts: list[schemas.Prompt]):
     user_prompt_uuids = await _get_user_prompt_uuids(db, user_uuid)
     for prompt_uuid in user_prompt_uuids:
         if prompt_uuid not in [prompt.id for prompt in prompts]:
@@ -790,16 +728,12 @@ async def delete_user_prompt(db: AsyncSession, user_uuid: UUID, prompt_uuid: UUI
 
 
 async def _get_user_prompt_uuids(db: AsyncSession, user_uuid: UUID) -> list[UUID]:
-    query = select(models.UserPrompts.uuid).where(
-        models.UserPrompts.user_uuid == user_uuid
-    )
+    query = select(models.UserPrompts.uuid).where(models.UserPrompts.user_uuid == user_uuid)
     result = await db.execute(query)
     return result.scalars().all()
 
 
-async def _update_user_prompt(
-    db: AsyncSession, user_uuid: UUID, prompt_uuid: UUID, prompt: schemas.Prompt
-):
+async def _update_user_prompt(db: AsyncSession, user_uuid: UUID, prompt_uuid: UUID, prompt: schemas.Prompt):
     update_query = (
         update(models.UserPrompts)
         .where(
@@ -813,12 +747,8 @@ async def _update_user_prompt(
     await db.commit()
 
 
-async def get_user_prompt_state(
-    db: AsyncSession, user_uuid: UUID
-) -> list[schemas.Prompt]:
-    query = select(models.UserPrompts.prompt).where(
-        models.UserPrompts.user_uuid == user_uuid
-    )
+async def get_user_prompt_state(db: AsyncSession, user_uuid: UUID) -> list[schemas.Prompt]:
+    query = select(models.UserPrompts.prompt).where(models.UserPrompts.user_uuid == user_uuid)
     result = (await db.execute(query)).scalars().all()
 
     prompts = []
@@ -831,9 +761,7 @@ async def get_user_prompt_state(
     return prompts
 
 
-async def delete_user_skills(
-    db: AsyncSession, user_uuid: UUID, skill_uuids: list[UUID]
-):
+async def delete_user_skills(db: AsyncSession, user_uuid: UUID, skill_uuids: list[UUID]):
     delete_query = delete(models.UserSkills).where(
         models.UserSkills.user_uuid == user_uuid,
         models.UserSkills.uuid.in_(skill_uuids),
@@ -842,9 +770,7 @@ async def delete_user_skills(
     await db.commit()
 
 
-async def update_user_skill(
-    db: AsyncSession, user_uuid: UUID, skill_uuid: UUID, skill: schemas.SkillCreate
-):
+async def update_user_skill(db: AsyncSession, user_uuid: UUID, skill_uuid: UUID, skill: schemas.SkillCreate):
     update_query = (
         update(models.UserSkills)
         .where(
@@ -878,16 +804,12 @@ async def entity_require_authenticator(db: AsyncSession, entity_uuid: UUID) -> b
     if not entity_uuid:
         return False
 
-    query = select(models.Entity.require_authenticator).where(
-        models.Entity.uuid == entity_uuid
-    )
+    query = select(models.Entity.require_authenticator).where(models.Entity.uuid == entity_uuid)
     result = (await db.execute(query)).scalar_one_or_none()
     return result is not None and result
 
 
-async def require_entity_users_2fa(
-    db: AsyncSession, entity_uuid: UUID, require_authenticator: bool
-) -> bool:
+async def require_entity_users_2fa(db: AsyncSession, entity_uuid: UUID, require_authenticator: bool) -> bool:
     entity_users = await get_entity_users(db, entity_uuid)
     for user_uuid in entity_users:
         update_query = (
@@ -966,9 +888,7 @@ async def create_default_roles(db: AsyncSession, entity_uuid: UUID) -> dict[str,
             continue
         roles[name] = uuid4()
         await db.execute(
-            insert(models.Role).values(
-                uuid=roles[name], name=name, entity_uuid=entity_uuid, **role_settings
-            )
+            insert(models.Role).values(uuid=roles[name], name=name, entity_uuid=entity_uuid, **role_settings)
         )
         if name == AGENT_USER_ROLE:
             await db.execute(
@@ -990,9 +910,7 @@ async def create_default_roles(db: AsyncSession, entity_uuid: UUID) -> dict[str,
     return roles
 
 
-async def give_default_roles(
-    db: AsyncSession, user_uuid: UUID, permissions_uuid: UUID | None, names: list[str]
-) -> None:
+async def give_default_roles(db: AsyncSession, user_uuid: UUID, permissions_uuid: UUID | None, names: list[str]) -> None:
     if permissions_uuid is None:
         return
     entity_uuid = await crud.get_user_entity_uuid(db, permissions_uuid)
@@ -1011,9 +929,7 @@ async def give_default_roles(
     )
     for role_uuid in roles.values():
         if role_uuid not in held:
-            await db.execute(
-                insert(models.UserRole).values(user_uuid=user_uuid, role_uuid=role_uuid)
-            )
+            await db.execute(insert(models.UserRole).values(user_uuid=user_uuid, role_uuid=role_uuid))
 
 
 async def role_exists(db: AsyncSession, role_uuid: UUID, entity_uuid: UUID) -> bool:
@@ -1062,9 +978,7 @@ async def remove_users_from_role(db: AsyncSession, role_uuid: UUID, users: list[
         await db.commit()
 
 
-async def get_role_copilot_access(
-    db: AsyncSession, role_uuids: list[UUID]
-) -> schemas.RoleCopilotAccess:
+async def get_role_copilot_access(db: AsyncSession, role_uuids: list[UUID]) -> schemas.RoleCopilotAccess:
     if not role_uuids:
         return schemas.RoleCopilotAccess()
 
@@ -1073,9 +987,7 @@ async def get_role_copilot_access(
             select(models.RoleCopilotModel.agent_id, models.RoleCopilotModel.model_id)
             .where(models.RoleCopilotModel.role_uuid.in_(role_uuids))
             .distinct()
-            .order_by(
-                models.RoleCopilotModel.agent_id, models.RoleCopilotModel.model_id
-            )
+            .order_by(models.RoleCopilotModel.agent_id, models.RoleCopilotModel.model_id)
         )
     ).all()
     mcp_rows = (
@@ -1087,37 +999,29 @@ async def get_role_copilot_access(
         )
     ).all()
     return schemas.RoleCopilotAccess(
-        models=[
-            schemas.CopilotModelGrant(agent_id=row[0], model_id=row[1])
-            for row in model_rows
-        ],
-        mcp=[
-            schemas.McpGrant.model_construct(server_url=row[0], tool_name=row[1])
-            for row in mcp_rows
-        ],
+        models=[schemas.CopilotModelGrant(agent_id=row[0], model_id=row[1]) for row in model_rows],
+        mcp=[schemas.McpGrant.model_construct(server_url=row[0], tool_name=row[1]) for row in mcp_rows],
     )
 
 
-async def get_user_copilot_access(
-    db: AsyncSession, user_uuid: UUID
-) -> schemas.CopilotAccess:
+async def get_user_copilot_access(db: AsyncSession, user_uuid: UUID) -> schemas.CopilotAccess:
     role_uuids = list(await _get_user_roles(db, user_uuid))
     granted = await get_role_copilot_access(db, role_uuids)
     return schemas.CopilotAccess(
         models=granted.models,
-        mcp=[*granted.mcp, *await get_backend_mcp_grants(db, user_uuid)],
+        mcp=[
+            *granted.mcp,
+            *await get_backend_mcp_grants(db, user_uuid),
+            *await get_own_mcp_grants(db, user_uuid),
+        ],
         disabled_capabilities=await get_disabled_copilot_capabilities(db, role_uuids),
     )
 
 
-async def get_disabled_copilot_capabilities(
-    db: AsyncSession, role_uuids: list[UUID]
-) -> list[schemas.CopilotCapability]:
+async def get_disabled_copilot_capabilities(db: AsyncSession, role_uuids: list[UUID]) -> list[schemas.CopilotCapability]:
     flags = (
         await db.execute(
-            select(models.Role.search_web, models.Role.fetch_from_web).where(
-                models.Role.uuid.in_(role_uuids)
-            )
+            select(models.Role.search_web, models.Role.fetch_from_web).where(models.Role.uuid.in_(role_uuids))
         )
     ).all()
     disabled = []
@@ -1128,50 +1032,27 @@ async def get_disabled_copilot_capabilities(
     return disabled
 
 
-async def set_role_copilot_access(
-    db: AsyncSession, role_uuid: UUID, access: schemas.RoleCopilotAccess
-) -> None:
-    await db.execute(
-        delete(models.RoleCopilotModel).where(
-            models.RoleCopilotModel.role_uuid == role_uuid
-        )
-    )
-    await db.execute(
-        delete(models.RoleMcpAccess).where(models.RoleMcpAccess.role_uuid == role_uuid)
-    )
+async def set_role_copilot_access(db: AsyncSession, role_uuid: UUID, access: schemas.RoleCopilotAccess) -> None:
+    await db.execute(delete(models.RoleCopilotModel).where(models.RoleCopilotModel.role_uuid == role_uuid))
+    await db.execute(delete(models.RoleMcpAccess).where(models.RoleMcpAccess.role_uuid == role_uuid))
     for agent_id, model_id in {(m.agent_id, m.model_id) for m in access.models}:
-        db.add(
-            models.RoleCopilotModel(
-                role_uuid=role_uuid, agent_id=agent_id, model_id=model_id
-            )
-        )
+        db.add(models.RoleCopilotModel(role_uuid=role_uuid, agent_id=agent_id, model_id=model_id))
     for server_url, tool_name in {(m.server_url, m.tool_name) for m in access.mcp}:
-        db.add(
-            models.RoleMcpAccess(
-                role_uuid=role_uuid, server_url=server_url, tool_name=tool_name
-            )
-        )
+        db.add(models.RoleMcpAccess(role_uuid=role_uuid, server_url=server_url, tool_name=tool_name))
     await db.commit()
 
 
 def disabled_mcp_tools(access: schemas.CopilotAccess) -> frozenset[str]:
     return frozenset(
-        tool
-        for capability in access.disabled_capabilities
-        for tool in schemas.CAPABILITY_MCP_TOOLS[capability]
+        tool for capability in access.disabled_capabilities for tool in schemas.CAPABILITY_MCP_TOOLS[capability]
     )
 
 
-def is_mcp_tool_allowed(
-    access: schemas.CopilotAccess, server_url: str, tool_name: str
-) -> bool:
+def is_mcp_tool_allowed(access: schemas.CopilotAccess, server_url: str, tool_name: str) -> bool:
     if tool_name in disabled_mcp_tools(access):
         return False
     url = schemas.normalize_mcp_url(server_url)
-    return any(
-        grant.server_url == url and grant.tool_name in {schemas.ALL_MCP_TOOLS, tool_name}
-        for grant in access.mcp
-    )
+    return any(grant.server_url == url and grant.tool_name in {schemas.ALL_MCP_TOOLS, tool_name} for grant in access.mcp)
 
 
 def check_copilot_access(
@@ -1185,11 +1066,7 @@ def check_copilot_access(
         if not named & granted:
             denied_model = request.model
 
-    denied_tools = [
-        tool
-        for tool in request.tools
-        if not is_mcp_tool_allowed(access, tool.url, tool.tool_name)
-    ]
+    denied_tools = [tool for tool in request.tools if not is_mcp_tool_allowed(access, tool.url, tool.tool_name)]
     return schemas.CopilotAuthorizeResult(
         allowed=agent_allowed and denied_model is None and not denied_tools,
         denied_model=denied_model,
@@ -1209,9 +1086,7 @@ async def get_role_users(db: AsyncSession, role_uuid: UUID) -> list[str]:
 
 
 async def get_role_user_uuids(db: AsyncSession, role_uuid: UUID) -> list[UUID]:
-    query = select(models.UserRole.user_uuid).where(
-        models.UserRole.role_uuid == role_uuid
-    )
+    query = select(models.UserRole.user_uuid).where(models.UserRole.role_uuid == role_uuid)
     return list((await db.execute(query)).scalars().all())
 
 
@@ -1249,9 +1124,7 @@ async def insert_or_update_backend_permissions(
     )
 
     if not result:
-        result = models.RoleBackend(
-            role_uuid=role_uuid, backend_uuid=backend_uuid, **permissions_dict
-        )
+        result = models.RoleBackend(role_uuid=role_uuid, backend_uuid=backend_uuid, **permissions_dict)
         db.add(result)
 
         return await db.commit()
@@ -1261,11 +1134,7 @@ async def insert_or_update_backend_permissions(
         if key == "widgets" and value:
             has_changes |= len(result.widgets or []) != len(value)
 
-            new_access = {
-                w.get("widgetId"): w.get("access")
-                for w in value
-                if w.get("widgetId") and w.get("access")
-            }
+            new_access = {w.get("widgetId"): w.get("access") for w in value if w.get("widgetId") and w.get("access")}
             for widget in result.widgets or []:
                 if has_changes:
                     break
@@ -1299,9 +1168,7 @@ async def insert_or_update_backend_permissions(
                 new_prompts_access: dict = new_prompts.get(template_id, {})
 
                 prompts_change = [
-                    p.get("promptId")
-                    for p in prompts
-                    if p.get("access") != new_prompts_access.get(p.get("promptId"))
+                    p.get("promptId") for p in prompts if p.get("access") != new_prompts_access.get(p.get("promptId"))
                 ]
                 template_change = template.get("access") != new_access.get(template_id)
                 has_changes |= bool(prompts_change or template_change)
@@ -1315,28 +1182,20 @@ async def insert_or_update_backend_permissions(
     await db.commit()
 
 
-async def insert_or_update_file_permissions(
-    db: AsyncSession, role_uuid: UUID, file_uuid: UUID, access: bool
-):
-    query = select(models.RoleFile).where(
-        models.RoleFile.role_uuid == role_uuid, models.RoleFile.file_uuid == file_uuid
-    )
+async def insert_or_update_file_permissions(db: AsyncSession, role_uuid: UUID, file_uuid: UUID, access: bool):
+    query = select(models.RoleFile).where(models.RoleFile.role_uuid == role_uuid, models.RoleFile.file_uuid == file_uuid)
     result = (await db.execute(query)).scalar_one_or_none()
 
     if result:
         result.access = access
     else:
-        result = models.RoleFile(
-            role_uuid=role_uuid, file_uuid=file_uuid, access=access
-        )
+        result = models.RoleFile(role_uuid=role_uuid, file_uuid=file_uuid, access=access)
         db.add(result)
 
     await db.commit()
 
 
-async def insert_or_update_prompt_permissions(
-    db: AsyncSession, role_uuid: UUID, prompt_uuid: UUID, access: bool
-):
+async def insert_or_update_prompt_permissions(db: AsyncSession, role_uuid: UUID, prompt_uuid: UUID, access: bool):
     query = select(models.RolePrompt).where(
         models.RolePrompt.role_uuid == role_uuid,
         models.RolePrompt.prompt_uuid == prompt_uuid,
@@ -1346,9 +1205,7 @@ async def insert_or_update_prompt_permissions(
     if result:
         result.access = access
     else:
-        result = models.RolePrompt(
-            role_uuid=role_uuid, prompt_uuid=prompt_uuid, access=access
-        )
+        result = models.RolePrompt(role_uuid=role_uuid, prompt_uuid=prompt_uuid, access=access)
         db.add(result)
 
     await db.commit()
@@ -1365,14 +1222,10 @@ async def insert_or_update_prompt_template_permissions(
     if not result:
         raise HTTPException(404, detail="Prompt not found")
 
-    permissions_templates_json = [
-        perm_tpl.model_dump() for perm_tpl in permissions.templates
-    ]
+    permissions_templates_json = [perm_tpl.model_dump() for perm_tpl in permissions.templates]
     template_id = permissions.templates[0].templateId
 
-    template_exists = any(
-        t["templateId"] == template_id for t in result.templates or []
-    )
+    template_exists = any(t["templateId"] == template_id for t in result.templates or [])
 
     if template_exists:
         templates = result.templates or []
@@ -1395,9 +1248,7 @@ async def _get_user_roles(db: AsyncSession, user_uuid: UUID) -> list[UUID]:
     return result
 
 
-async def _get_role_backend_permissions(
-    db: AsyncSession, role_uuid: UUID
-) -> list[schemas.BackendPermissionsModel]:
+async def _get_role_backend_permissions(db: AsyncSession, role_uuid: UUID) -> list[schemas.BackendPermissionsModel]:
     query = (
         select(
             models.RoleBackend.backend_uuid,
@@ -1431,9 +1282,7 @@ async def _get_role_backend_permissions(
             ).label("created_by"),
         )
         .select_from(models.RoleBackend)
-        .join(
-            models.ApiSource, models.ApiSource.uuid == models.RoleBackend.backend_uuid
-        )
+        .join(models.ApiSource, models.ApiSource.uuid == models.RoleBackend.backend_uuid)
         .join(
             models.User,
             models.User.uuid == models.ApiSource.user_uuid,
@@ -1459,11 +1308,7 @@ async def _get_role_backend_permissions(
             "templates": [
                 {
                     **t,
-                    "prompts": [
-                        p
-                        for p in t.get("prompts", [])
-                        if p.get("access") != "no-access"
-                    ],
+                    "prompts": [p for p in t.get("prompts", []) if p.get("access") != "no-access"],
                 }
                 for t in (row.templates or [])
                 if t["access"] != "no-access"
@@ -1478,18 +1323,14 @@ async def _get_role_backend_permissions(
     ]
 
 
-async def _get_role_file_permissions(
-    db: AsyncSession, role_uuid: UUID
-) -> list[schemas.FilePermissionsModel]:
+async def _get_role_file_permissions(db: AsyncSession, role_uuid: UUID) -> list[schemas.FilePermissionsModel]:
     query = (
         select(
             models.RoleFile.file_uuid,
             models.FileWidget.name,
             models.FileWidget.description,
             models.RoleFile.access,
-            case(
-                (models.RoleFile.access == "access", models.FileWidget.url), else_=None
-            ).label("url"),
+            case((models.RoleFile.access == "access", models.FileWidget.url), else_=None).label("url"),
         )
         .select_from(models.RoleFile)
         .join(models.FileWidget, models.FileWidget.uuid == models.RoleFile.file_uuid)
@@ -1511,9 +1352,7 @@ async def _get_role_file_permissions(
     ]
 
 
-async def _get_role_prompt_permissions(
-    db: AsyncSession, role_uuid: UUID
-) -> list[schemas.PromptPermissionsModel]:
+async def _get_role_prompt_permissions(db: AsyncSession, role_uuid: UUID) -> list[schemas.PromptPermissionsModel]:
     query = (
         select(
             models.RolePrompt.prompt_uuid,
@@ -1521,9 +1360,7 @@ async def _get_role_prompt_permissions(
             models.RolePrompt.access,
         )
         .select_from(models.RolePrompt)
-        .join(
-            models.UserPrompts, models.RolePrompt.prompt_uuid == models.UserPrompts.uuid
-        )
+        .join(models.UserPrompts, models.RolePrompt.prompt_uuid == models.UserPrompts.uuid)
         .where(
             models.RolePrompt.role_uuid == role_uuid,
             models.RolePrompt.access != "no-access",
@@ -1540,9 +1377,7 @@ async def _get_role_prompt_permissions(
     ]
 
 
-async def get_user_role_permissions(
-    db: AsyncSession, user_uuid: UUID
-) -> schemas.UserRolesPermissions:
+async def get_user_role_permissions(db: AsyncSession, user_uuid: UUID) -> schemas.UserRolesPermissions:
     permissions = {}
 
     roles = await _get_user_roles(db, user_uuid)
@@ -1587,9 +1422,7 @@ def flatten_permissions(
                     flattened_resources[resource_id] = resource
                 else:
                     existing = flattened_resources[resource_id]
-                    existing["access"] = _get_most_permissive_access(
-                        existing["access"], resource["access"]
-                    )
+                    existing["access"] = _get_most_permissive_access(existing["access"], resource["access"])
 
                     if merge_fn:
                         merge_fn(existing, resource)
@@ -1602,17 +1435,11 @@ def flatten_permissions(
         return list(flattened_resources.values())
 
     def _merge_backend_specifics(existing, new):
-        existing["widgets"] = _merge_items(
-            existing["widgets"], new["widgets"], "widgetId"
-        )
-        existing["templates"] = _merge_items(
-            existing["templates"], new["templates"], "templateId"
-        )
+        existing["widgets"] = _merge_items(existing["widgets"], new["widgets"], "widgetId")
+        existing["templates"] = _merge_items(existing["templates"], new["templates"], "templateId")
 
     return schemas.UserRolesPermissionsFlattened(
-        backends=_handle_resource_type(
-            permissions_dict, "backends", "uuid", _merge_backend_specifics
-        ),
+        backends=_handle_resource_type(permissions_dict, "backends", "uuid", _merge_backend_specifics),
         files=_handle_resource_type(permissions_dict, "files", "uuid"),
         prompts=_handle_resource_type(permissions_dict, "prompts", "uuid"),
     )
@@ -1679,9 +1506,7 @@ async def _update_backend_widgets(dc, role_uuid, backend):
                 if w.get("widgetId") == widget_id:
                     w["access"].append({role_uuid: widget.get("access")})
         else:
-            dc["widgets"].append(
-                {"widgetId": widget_id, "access": [{role_uuid: widget.get("access")}]}
-            )
+            dc["widgets"].append({"widgetId": widget_id, "access": [{role_uuid: widget.get("access")}]})
 
 
 async def _add_or_update_template_prompt(
@@ -1729,9 +1554,7 @@ async def process_templates(  # noqa: PLR0913, PLR0917
             processed_templates.add(template_id)
 
             for prompt in template.get("prompts", []):
-                await _add_or_update_template_prompt(
-                    role_uuid, prompt, template_id, prompts_list, processed_prompts
-                )
+                await _add_or_update_template_prompt(role_uuid, prompt, template_id, prompts_list, processed_prompts)
         else:
             for t in templates:
                 if t.get("templateId") == template_id:
@@ -1746,9 +1569,7 @@ async def process_templates(  # noqa: PLR0913, PLR0917
                         )
 
 
-async def process_backend(
-    role_uuid: UUID, backend, data_connectors: list, processed_backends: set
-):
+async def process_backend(role_uuid: UUID, backend, data_connectors: list, processed_backends: set):
     backend_uuid = backend.get("uuid")
     if backend_uuid not in processed_backends:
         backend_entry = {
@@ -1768,9 +1589,7 @@ async def process_backend(
                 await _update_backend_widgets(dc, role_uuid, backend)
 
 
-async def process_file(
-    role_uuid: UUID, file, data_connectors: list, processed_files: set
-):
+async def process_file(role_uuid: UUID, file, data_connectors: list, processed_files: set):
     file_uuid = file.get("uuid")
     if file_uuid not in processed_files:
         data_connectors.append(
@@ -1789,9 +1608,7 @@ async def process_file(
                 dc["access"].append({role_uuid: file.get("access")})
 
 
-async def process_prompts(
-    role_uuid: UUID, prompts_data: list, processed_prompts: set, prompts_list: list
-):
+async def process_prompts(role_uuid: UUID, prompts_data: list, processed_prompts: set, prompts_list: list):
     for prompt in prompts_data:
         prompt_uuid = prompt.get("uuid")
         if prompt_uuid not in processed_prompts:
@@ -1842,9 +1659,7 @@ async def add_final_permissions_to_resources(  # noqa: PLR0912
                 for access_entry in widget.get("access", []):
                     for role, access in access_entry.items():
                         widget_role_permissions[role] = access
-                widget["final_permission"] = await compute_final_permission(
-                    widget_role_permissions
-                )
+                widget["final_permission"] = await compute_final_permission(widget_role_permissions)
 
     for template in templates:
         role_permissions = {}
@@ -1861,9 +1676,7 @@ async def add_final_permissions_to_resources(  # noqa: PLR0912
         prompt["final_permission"] = await compute_final_permission(role_permissions)
 
 
-async def get_shared_file_uuids(
-    db: AsyncSession, user: models.User | None
-) -> list[UUID]:
+async def get_shared_file_uuids(db: AsyncSession, user: models.User | None) -> list[UUID]:
     if not user:
         return []
 

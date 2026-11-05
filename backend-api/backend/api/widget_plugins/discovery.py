@@ -4,14 +4,24 @@ import json
 import os
 import re
 import stat
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from defusedxml import DefusedXmlException
+from defusedxml.ElementTree import ParseError, fromstring
 from pydantic import ValidationError
 
-from .manifest import PLUGIN_ID_PATTERN, VERSION_PATTERN, Manifest
+from .manifest import (
+    ACTION_ICON_ATTRIBUTES,
+    ACTION_ICON_TAGS,
+    ACTION_ICON_VALUES,
+    MAX_ACTION_ICON_BYTES,
+    PLUGIN_ID_PATTERN,
+    VERSION_PATTERN,
+    Manifest,
+)
 
 MANIFEST_FILE = "plugin.json"
 MAX_MANIFEST_BYTES = 256 * 1024
@@ -182,6 +192,48 @@ def _check_skill_file(found: DiscoveredVersion, version_dir: Path, path: str) ->
             found.fail("manifest", f"{path}: a skill is not empty")
 
 
+def _element_problems(root: Any) -> Iterator[str]:
+    for element in root.iter():
+        tag = element.tag.rsplit("}", 1)[-1]
+        if element is root and tag != "svg":
+            yield "is not an <svg> element"
+        if tag not in ACTION_ICON_TAGS:
+            yield f"has the element <{tag}>, which an action icon cannot use"
+        for name, value in element.attrib.items():
+            local = name.rsplit("}", 1)[-1]
+            if local not in ACTION_ICON_ATTRIBUTES:
+                yield f"has the attribute {local} on <{tag}>, which an action icon cannot use"
+            elif not re.fullmatch(ACTION_ICON_VALUES[local], value.strip()):
+                yield f"has a value of {local} on <{tag}> that an action icon cannot use"
+
+
+def action_icon_problem(text: str) -> str | None:
+    try:
+        root = fromstring(text, forbid_dtd=True)
+    except DefusedXmlException:
+        return "has a DOCTYPE or an entity"
+    except ParseError as exc:
+        return f"is not well-formed XML: {exc}"
+    return next(_element_problems(root), None)
+
+
+def _check_action_icon(found: DiscoveredVersion, version_dir: Path, path: str) -> None:
+    info = found.files.get(path)
+    if info is None:
+        return
+    if info.size > MAX_ACTION_ICON_BYTES:
+        found.fail("manifest", f"{path}: an action icon is at most {MAX_ACTION_ICON_BYTES} bytes")
+        return
+    try:
+        text = (version_dir / path).read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        found.fail("manifest", f"{path}: an action icon is UTF-8 text")
+        return
+    problem = action_icon_problem(text)
+    if problem:
+        found.fail("manifest", f"{path}: the action icon {problem}")
+
+
 def inspect_version(  # noqa: PLR0911, PLR0912
     root: Path,
     plugin_id: str,
@@ -195,6 +247,9 @@ def inspect_version(  # noqa: PLR0911, PLR0912
 ) -> DiscoveredVersion:
     found = DiscoveredVersion(plugin_id=plugin_id, version=version_name, path=f"{plugin_id}/{version_name}")
     version_dir = root / plugin_id / version_name
+    if not version_dir.is_dir():
+        found.fail("files", f"{found.path} is missing")
+        return found
     _walk(version_dir, found, max_files, max_bytes, cached_sha256 if development else sha256_file)
     if found.errors:
         return found
@@ -243,6 +298,8 @@ def inspect_version(  # noqa: PLR0911, PLR0912
             found.fail("manifest", f"{path}: named by the manifest but missing")
     for path in sorted(manifest.skill_paths()):
         _check_skill_file(found, version_dir, path)
+    for path in sorted(manifest.action_icon_paths()):
+        _check_action_icon(found, version_dir, path)
     if not development:
         _check_pin(found, pins.get(f"{plugin_id}@{version_name}"), require_pins)
 

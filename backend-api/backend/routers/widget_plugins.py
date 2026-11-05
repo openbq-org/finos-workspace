@@ -11,8 +11,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from api import auth_helpers, models
 from api.database import aget_read_db, aget_write_db
+from api.models.widget_plugin_models import DEFAULT_PRESET_LIMIT
 from api.rate_limit import LIMIT_DEFAULT, limiter
-from api.widget_plugins import backends, broker, calls, service, widgets_schema
+from api.widget_plugins import backends, broker, calls, presets, service, widgets_schema
 from api.widget_plugins.manifest import PLUGIN_ID_PATTERN, VERSION_PATTERN, WIDGET_ID_PATTERN
 from api.widget_plugins.proxy import NAME_PATTERN, PROXY_ID_PATTERN, CallError
 from api.widget_plugins.secrets import MAX_SECRET_LENGTH
@@ -20,6 +21,8 @@ from routers import app_helpers
 
 TAGS: list[str | Any] = ["widget-plugins"]
 PluginId = Annotated[str, StringConstraints(pattern=PLUGIN_ID_PATTERN)]
+WidgetId = Annotated[str, StringConstraints(pattern=WIDGET_ID_PATTERN), Path(description="The id of the widget.")]
+PresetId = Annotated[UUID, Path(description="The id of the preset.")]
 DATA_SOURCE_PATTERN = r"^[a-z][a-z0-9_-]{0,63}$"
 
 platform_router = APIRouter(prefix="/plugins", tags=TAGS)
@@ -127,6 +130,47 @@ class EntityChanges(BaseModel):
             "For each widget type that the plugin handles, the id of the plugin widget that renders it for the "
             "organization, or null to clear the choice."
         ),
+    )
+    preset_limit: int | None = Field(
+        None,
+        ge=1,
+        le=100000,
+        description=(
+            "How many presets each user may keep of each of the plugin's widgets, or null for the default of "
+            f"{DEFAULT_PRESET_LIMIT}."
+        ),
+    )
+
+
+class PresetBody(BaseModel):
+    model_config = closed
+
+    name: Annotated[str, StringConstraints(max_length=200)] = Field(
+        description="The name of the preset, 1 to 80 characters once trimmed."
+    )
+    config: dict[str, Any] | None = Field(
+        None, description="The values of the widget's settings. They must satisfy the widget's settings schema."
+    )
+    state: Any = Field(None, description="The plugin's own state of the widget, at most 64 KiB of JSON.")
+    is_default: bool = Field(
+        False, description="Whether the preset is the default, which a new card of the widget starts from."
+    )
+
+
+class PresetChanges(BaseModel):
+    model_config = closed
+
+    name: Annotated[str, StringConstraints(max_length=200)] | None = Field(
+        None, description="The new name of the preset, 1 to 80 characters once trimmed."
+    )
+    config: dict[str, Any] | None = Field(
+        None,
+        description="The new values of the widget's settings, or null to clear them. They must satisfy the widget's "
+        "settings schema.",
+    )
+    state: Any = Field(None, description="The plugin's new state of the widget, at most 64 KiB of JSON.")
+    is_default: bool | None = Field(
+        None, description="Whether the preset is the default, which a new card of the widget starts from."
     )
 
 
@@ -544,7 +588,8 @@ async def list_entity_plugins(
     description=(
         "Applies the changes in the request to what the admin's organization does with the plugin: enabling it, "
         "narrowing its permissions, frame sources and server hosts, mapping its data sources to the organization's "
-        "backends, filling in its settings, and choosing which plugin renders a widget type."
+        "backends, filling in its settings, choosing which plugin renders a widget type, and setting how many presets "
+        "each user may keep of each widget."
     ),
 )
 async def put_entity_plugin(
@@ -587,6 +632,84 @@ async def get_entity_plugin_events(
     admin: Annotated[Row, Depends(auth_helpers.get_current_admin)],
 ):
     return await service.plugin_events(db, plugin_id, await _admin_entity(db, admin))
+
+
+@admin_router.get(
+    "/plugins/{plugin_id}/widgets/{widget_id}/presets",
+    summary="List the organization's presets of a plugin widget",
+    description=(
+        "Returns `{ presets }`, the presets that the admin's organization publishes for the widget, ordered by name. "
+        "Each preset is `{ id, name, scope, is_default, config, state, updated_at }`. Answers 404 when the plugin has "
+        "no approved version with that widget."
+    ),
+)
+async def get_org_presets(
+    plugin_id: Annotated[PluginId, Path(description="The id of the plugin.")],
+    widget_id: WidgetId,
+    db: Annotated[AsyncSession, Depends(aget_read_db)],
+    admin: Annotated[Row, Depends(auth_helpers.get_current_admin)],
+):
+    target = await presets.org_target(db, await _admin_entity(db, admin), plugin_id, widget_id)
+    return {"presets": await presets.listing(db, target)}
+
+
+@admin_router.post(
+    "/plugins/{plugin_id}/widgets/{widget_id}/presets",
+    summary="Publish a preset of a plugin widget to the organization",
+    description=(
+        "Saves a preset that every user of the admin's organization who may use the widget can apply, and returns it. "
+        "Making it the default replaces the organization's previous default for the widget. Answers 404 when the "
+        "plugin has no approved version with that widget, 422 when the name or the settings are not valid, and 413 "
+        "when the state is too large."
+    ),
+)
+async def post_org_preset(
+    plugin_id: Annotated[PluginId, Path(description="The id of the plugin.")],
+    widget_id: WidgetId,
+    body: PresetBody,
+    db: Annotated[AsyncSession, Depends(aget_write_db)],
+    admin: Annotated[Row, Depends(auth_helpers.get_current_admin)],
+):
+    target = await presets.org_target(db, await _admin_entity(db, admin), plugin_id, widget_id)
+    return await presets.create(db, target, body.model_dump())
+
+
+@admin_router.patch(
+    "/plugins/{plugin_id}/widgets/{widget_id}/presets/{preset_id}",
+    summary="Change a preset that the organization publishes",
+    description=(
+        "Applies the changes in the request to one of the organization's presets of the widget and returns it. Making "
+        "it the default replaces the organization's previous default for the widget. Answers 404 when the preset does "
+        "not exist, 422 when the name or the settings are not valid, and 413 when the state is too large."
+    ),
+)
+async def patch_org_preset(
+    plugin_id: Annotated[PluginId, Path(description="The id of the plugin.")],
+    widget_id: WidgetId,
+    preset_id: PresetId,
+    body: PresetChanges,
+    db: Annotated[AsyncSession, Depends(aget_write_db)],
+    admin: Annotated[Row, Depends(auth_helpers.get_current_admin)],
+):
+    target = await presets.org_target(db, await _admin_entity(db, admin), plugin_id, widget_id)
+    return await presets.change(db, target, preset_id, body.model_dump(exclude_unset=True))
+
+
+@admin_router.delete(
+    "/plugins/{plugin_id}/widgets/{widget_id}/presets/{preset_id}",
+    summary="Delete a preset that the organization publishes",
+    description="Deletes one of the organization's presets of the widget. Answers 404 when the preset does not exist.",
+)
+async def delete_org_preset(
+    plugin_id: Annotated[PluginId, Path(description="The id of the plugin.")],
+    widget_id: WidgetId,
+    preset_id: PresetId,
+    db: Annotated[AsyncSession, Depends(aget_write_db)],
+    admin: Annotated[Row, Depends(auth_helpers.get_current_admin)],
+):
+    target = await presets.org_target(db, await _admin_entity(db, admin), plugin_id, widget_id)
+    await presets.remove(db, target, preset_id)
+    return {"success": True}
 
 
 @admin_router.get(
@@ -679,6 +802,88 @@ async def get_widgets_schema(
     if request.headers.get("if-none-match") == f'"{etag}"':
         return Response(status_code=304, headers={"ETag": f'"{etag}"', "Cache-Control": "private, no-cache"})
     return schema
+
+
+@app_router.get(
+    "/{plugin_id}/widgets/{widget_id}/presets",
+    summary="List the presets of a plugin widget",
+    description=(
+        "Returns `{ presets, limit }`: the signed-in user's own presets of the widget, then the presets that the "
+        "organization publishes, each group ordered by name, and how many presets the user may keep of the widget. "
+        "Each preset is `{ id, name, scope, is_default, config, state, updated_at }`, where `scope` is `user` or "
+        "`org`. Answers 404 when the user may not use the widget."
+    ),
+)
+async def get_presets(
+    plugin_id: Annotated[PluginId, Path(description="The id of the plugin.")],
+    widget_id: WidgetId,
+    db: Annotated[AsyncSession, Depends(aget_read_db)],
+    user=Depends(auth_helpers.GetCurrentUser(["uuid"], app_session=True)),
+):
+    target, limit = await presets.user_target(db, user.uuid, plugin_id, widget_id)
+    return {"presets": await presets.listing(db, target), "limit": limit}
+
+
+@app_router.post(
+    "/{plugin_id}/widgets/{widget_id}/presets",
+    summary="Save a preset of a plugin widget",
+    description=(
+        "Saves the settings and the state in the request as a preset of the signed-in user, which they can apply on "
+        "any of their dashboards, and returns it. Making it the default replaces the user's previous default for the "
+        "widget. Answers 404 when the user may not use the widget, 409 when the user already keeps as many presets of "
+        "the widget as the organization allows, 422 when the name or the settings are not valid, and 413 when the "
+        "state is too large."
+    ),
+)
+async def post_preset(
+    plugin_id: Annotated[PluginId, Path(description="The id of the plugin.")],
+    widget_id: WidgetId,
+    body: PresetBody,
+    db: Annotated[AsyncSession, Depends(aget_write_db)],
+    user=Depends(auth_helpers.GetCurrentUser(["uuid"], app_session=True)),
+):
+    target, limit = await presets.user_target(db, user.uuid, plugin_id, widget_id)
+    return await presets.create(db, target, body.model_dump(), limit)
+
+
+@app_router.patch(
+    "/{plugin_id}/widgets/{widget_id}/presets/{preset_id}",
+    summary="Change a preset of a plugin widget",
+    description=(
+        "Applies the changes in the request to one of the signed-in user's own presets and returns it. Making it the "
+        "default replaces the user's previous default for the widget. Answers 404 when the preset is not one of the "
+        "user's own, 422 when the name or the settings are not valid, and 413 when the state is too large."
+    ),
+)
+async def patch_preset(
+    plugin_id: Annotated[PluginId, Path(description="The id of the plugin.")],
+    widget_id: WidgetId,
+    preset_id: PresetId,
+    body: PresetChanges,
+    db: Annotated[AsyncSession, Depends(aget_write_db)],
+    user=Depends(auth_helpers.GetCurrentUser(["uuid"], app_session=True)),
+):
+    target, _ = await presets.user_target(db, user.uuid, plugin_id, widget_id)
+    return await presets.change(db, target, preset_id, body.model_dump(exclude_unset=True))
+
+
+@app_router.delete(
+    "/{plugin_id}/widgets/{widget_id}/presets/{preset_id}",
+    summary="Delete a preset of a plugin widget",
+    description=(
+        "Deletes one of the signed-in user's own presets. Answers 404 when the preset is not one of the user's own."
+    ),
+)
+async def delete_preset(
+    plugin_id: Annotated[PluginId, Path(description="The id of the plugin.")],
+    widget_id: WidgetId,
+    preset_id: PresetId,
+    db: Annotated[AsyncSession, Depends(aget_write_db)],
+    user=Depends(auth_helpers.GetCurrentUser(["uuid"], app_session=True)),
+):
+    target, _ = await presets.user_target(db, user.uuid, plugin_id, widget_id)
+    await presets.remove(db, target, preset_id)
+    return {"success": True}
 
 
 @app_router.get(

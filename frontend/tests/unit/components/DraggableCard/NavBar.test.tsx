@@ -1,4 +1,5 @@
 import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { act, type ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import NavBar from "~/components/DraggableCard/NavBar";
@@ -59,6 +60,10 @@ vi.mock("~/components/Widgets/Helpers/GroupDropdown", () => ({
       {children ?? paramDef?.label ?? paramDef?.paramName}
     </div>
   ),
+}));
+
+vi.mock("~/components/MoveToDropDown", () => ({
+  MoveToTabsDropdownMenu: () => null,
 }));
 
 vi.mock("usehooks-ts", () => ({
@@ -503,6 +508,7 @@ describe("NavBar - Locked dashboard", () => {
             isMinimized: false,
           },
         },
+        widget: { widgetId: "test-widget" },
         activeDashboardId: "dashboard-1",
         isShared: false,
         updateWidget: vi.fn(),
@@ -533,6 +539,28 @@ describe("NavBar - Locked dashboard", () => {
     render(<NavBar title="Test Widget" />);
 
     expect(document.querySelector(".draggable-handle")).toHaveClass("md:cursor-move");
+  });
+
+  it("tells the card when its settings open from the menu and close", async () => {
+    const user = userEvent.setup();
+    const setOpenSettings = vi.fn();
+    render(
+      <NavBar
+        title="Test Widget"
+        settingsModalChildren={<span>Card settings</span>}
+        showActionsSettings
+        setOpenSettings={setOpenSettings}
+      />,
+    );
+    setOpenSettings.mockClear();
+
+    await user.click(document.querySelector("[aria-haspopup=menu]") as HTMLElement);
+    await user.click(await screen.findByText("Settings"));
+    await screen.findByText("Card settings");
+    expect(setOpenSettings).toHaveBeenLastCalledWith(true);
+
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(setOpenSettings).toHaveBeenLastCalledWith(false));
   });
 
   it("does not show the move cursor on the title of a locked widget", () => {

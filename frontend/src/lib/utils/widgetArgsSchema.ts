@@ -104,7 +104,7 @@ function settingsJsonSchema(settings: SettingsSchema): JsonSchema {
   };
 }
 
-function pluginSettings(
+export function pluginSettings(
   widget: Pick<WidgetT, "type" | "plugin">,
 ): SettingsSchema | undefined {
   const resolved = widget.plugin

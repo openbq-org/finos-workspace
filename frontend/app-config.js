@@ -61,6 +61,137 @@ function valueOf(variable, type, raw) {
   throw new Error("unknown type " + type + " for " + variable);
 }
 
+const PLUGIN_SHELL_HASH = "'sha256-SwQ+ybsi2+FldUwGr9q2n39PxMGAMlGhGuKJ5K4cSdY='";
+const GOOGLE_SIGN_IN = "https://accounts.google.com/gsi/";
+const LOCAL_FRAMES = ["http://localhost:*", "http://127.0.0.1:*", "http://0.0.0.0:*"];
+const DIRECTIVES = [
+  "default-src",
+  "script-src",
+  "style-src",
+  "img-src",
+  "font-src",
+  "connect-src",
+  "frame-src",
+  "worker-src",
+  "media-src",
+  "manifest-src",
+  "object-src",
+  "base-uri",
+  "form-action",
+  "frame-ancestors",
+];
+const EXTRA_SOURCE =
+  /^('(self|unsafe-inline|unsafe-eval|wasm-unsafe-eval)'|'sha(256|384|512)-[A-Za-z0-9+/]+=*'|[a-z][a-z0-9+.-]*:|([a-z][a-z0-9+.-]*:\/\/)?(\*\.)?[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*(:([0-9]+|\*))?(\/[A-Za-z0-9._~!$&()*+=:@%/-]*)?)$/;
+
+const HEADER_FIELDS = [
+  [
+    "CSP_EXTRA_SOURCES",
+    "Sources to add to the Content-Security-Policy, written like the policy itself: directives separated by semicolons, each followed by its sources, for example img-src https://cdn.example.com; frame-ancestors https://portal.example.com.",
+  ],
+  [
+    "CSP_REPORT_ONLY",
+    "true sends the policy as Content-Security-Policy-Report-Only, so the browser reports what it would block without blocking it. Must be true or false.",
+  ],
+];
+
+function originOf(url) {
+  const match = /^(https?):\/\/([^/?#\s]+)/i.exec(url || "");
+  return match ? match[1].toLowerCase() + "://" + match[2].toLowerCase() : null;
+}
+
+function extraSources(raw) {
+  const extra = {};
+  const parts = (raw || "").split(";");
+  for (let i = 0; i < parts.length; i++) {
+    const words = parts[i].trim().split(/\s+/).filter(function (word) {
+      return word !== "";
+    });
+    if (words.length === 0) {
+      continue;
+    }
+    const directive = words[0].toLowerCase();
+    if (DIRECTIVES.indexOf(directive) === -1) {
+      throw new Error("CSP_EXTRA_SOURCES names " + directive + ", which is not a directive the policy sets");
+    }
+    for (let j = 1; j < words.length; j++) {
+      if (!EXTRA_SOURCE.test(words[j])) {
+        throw new Error("CSP_EXTRA_SOURCES has " + words[j] + ", which is not a source expression");
+      }
+    }
+    extra[directive] = (extra[directive] || []).concat(words.slice(1));
+  }
+  return extra;
+}
+
+function policy(env) {
+  if (env.CSP_REPORT_ONLY !== undefined && env.CSP_REPORT_ONLY !== "true" && env.CSP_REPORT_ONLY !== "false") {
+    throw new Error("CSP_REPORT_ONLY must be true or false");
+  }
+  const backend = originOf(env.BACKEND_URL);
+  const ai = originOf(env.AI_API_URL);
+  const google =
+    (env.AUTHENTICATION_IDENTITY_PROVIDERS || "")
+      .split(",")
+      .map(function (item) {
+        return item.toLowerCase().trim();
+      })
+      .indexOf("google") !== -1;
+  const htmlScripts = env.ALLOW_HTML_JS_EXECUTION === "true";
+  const images = [env.WL_LOGIN_IMAGE, env.WL_LEFT_SIDEBAR_LOGO, env.WL_LEFT_SIDEBAR_LOGO_DARK, env.WL_FAVICON].map(originOf);
+  const sources = {
+    "default-src": ["'self'"],
+    "script-src": ["'self'", "'unsafe-eval'", "'wasm-unsafe-eval'", "blob:"]
+      .concat(htmlScripts ? ["'unsafe-inline'", "https:"] : [PLUGIN_SHELL_HASH])
+      .concat(google ? [GOOGLE_SIGN_IN + "client"] : []),
+    "style-src": ["'self'", "'unsafe-inline'", originOf(env.WL_STYLESHEET)].concat(google ? [GOOGLE_SIGN_IN] : []),
+    "img-src": ["'self'", "data:", "blob:", "https:", backend].concat(images),
+    "font-src": ["'self'", "data:", "https:"],
+    "connect-src": ["'self'", "blob:", "data:", "https:", "wss:", backend, backend && backend.replace(/^http/, "ws"), ai].concat(
+      google ? [GOOGLE_SIGN_IN] : [],
+    ),
+    "frame-src": ["'self'", "blob:", "data:", "https:", backend].concat(LOCAL_FRAMES).concat(google ? [GOOGLE_SIGN_IN] : []),
+    "worker-src": ["'self'", "blob:"],
+    "media-src": ["'self'", "data:", "blob:", "https:"],
+    "manifest-src": ["'self'"],
+    "object-src": ["'none'"],
+    "base-uri": ["'none'"],
+    "form-action": ["'self'", "https:"],
+    "frame-ancestors": ["'self'"],
+  };
+  const extra = extraSources(env.CSP_EXTRA_SOURCES);
+  return DIRECTIVES.map(function (directive) {
+    const seen = [];
+    const list = sources[directive].concat(extra[directive] || []);
+    for (let i = 0; i < list.length; i++) {
+      if (list[i] && seen.indexOf(list[i]) === -1) {
+        seen.push(list[i]);
+      }
+    }
+    return directive + " " + seen.join(" ");
+  }).join("; ");
+}
+
+function headers(env) {
+  try {
+    const value = policy(env);
+    return env.CSP_REPORT_ONLY === "true" ? { enforce: "", reportOnly: value } : { enforce: value, reportOnly: "" };
+  } catch (error) {
+    return { enforce: "default-src 'none'", reportOnly: "", error: error.message };
+  }
+}
+
+function contentSecurityPolicy(r) {
+  const result = headers(process.env);
+  if (result.error) {
+    r.error(result.error);
+  }
+  return result.enforce;
+}
+
+function contentSecurityPolicyReportOnly() {
+  return headers(process.env).reportOnly;
+}
+
 function render(env) {
   const config = {};
   for (let i = 0; i < FIELDS.length; i++) {
@@ -92,6 +223,7 @@ function configJs(r) {
 function healthz(r) {
   try {
     render(process.env);
+    policy(process.env);
   } catch (error) {
     r.error(error.message);
     r.return(500, JSON.stringify({ status: "error", error: error.message }));
@@ -100,4 +232,15 @@ function healthz(r) {
   r.return(200, '{"status": "ok"}');
 }
 
-export default { FIELDS: FIELDS, render: render, configJs: configJs, healthz: healthz };
+export default {
+  FIELDS: FIELDS,
+  HEADER_FIELDS: HEADER_FIELDS,
+  PLUGIN_SHELL_HASH: PLUGIN_SHELL_HASH,
+  render: render,
+  policy: policy,
+  headers: headers,
+  configJs: configJs,
+  healthz: healthz,
+  contentSecurityPolicy: contentSecurityPolicy,
+  contentSecurityPolicyReportOnly: contentSecurityPolicyReportOnly,
+};

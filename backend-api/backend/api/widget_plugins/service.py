@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from api import models
 from api.base import get_now
 from api.models.widget_plugin_models import (
+    DEFAULT_PRESET_LIMIT,
     PLUGIN_DISABLED,
     PLUGIN_ENABLED,
     PLUGIN_REVOKED,
@@ -48,7 +49,7 @@ from .discovery import (
     scan,
     sha256_file,
 )
-from .manifest import PERMISSIONS, VERSION_PATTERN
+from .manifest import ACTION_PERMISSIONS, PERMISSIONS, VERSION_PATTERN
 from .schema_lint import validate_settings_values
 
 CHANGED = "the files changed after discovery; versions are immutable, so publish a new version"
@@ -1057,9 +1058,7 @@ async def set_overrides(  # noqa: PLR0913
     errors, needed = list(check.errors), set(check.needs)
     if server_network is not None:
         backend = any(_server(v.manifest).get("backend") for v in await _versions(db, plugin))
-        network_check = proxy_rules.check_network(
-            server_network, confirmations=given, override=True, backend=backend
-        )
+        network_check = proxy_rules.check_network(server_network, confirmations=given, override=True, backend=backend)
         errors.extend(network_check.errors)
         needed |= network_check.needs
         if len(set(server_network)) != len(server_network):
@@ -1231,6 +1230,7 @@ async def entity_listing(db: AsyncSession, entity_uuid: UUID) -> list[dict[str, 
                     vt: widget_id for vt, (plugin_uuid, widget_id) in handlers.items() if plugin_uuid == plugin.uuid
                 },
                 "role_grants": grants,
+                "preset_limit": (row.preset_limit if row else None) or DEFAULT_PRESET_LIMIT,
             }
         )
     return result
@@ -1286,6 +1286,8 @@ async def update_entity(  # noqa: PLR0912, PLR0915
         if problems:
             raise HTTPException(422, detail={"message": "Invalid settings", "errors": problems})
         row.settings = changes["settings"]
+    if "preset_limit" in changes:
+        row.preset_limit = changes["preset_limit"]
     if changes.get("handlers") is not None:
         handled = {h["type"]: w["id"] for w in _widgets(manifest) for h in w.get("handles", [])}
         for viz_type, widget_id in changes["handlers"].items():
@@ -1659,6 +1661,9 @@ async def user_listing(db: AsyncSession, user_uuid: UUID) -> dict[str, Any]:
                         "params": w.get("params", []),
                         "settings": w.get("settings"),
                         "grid": w.get("grid") or {"w": 20, "h": 12},
+                        "actions": [
+                            a for a in w.get("actions", []) if ACTION_PERMISSIONS[a["placement"]] in w["permissions"]
+                        ],
                     }
                     for w in entry["widgets"]
                 ],

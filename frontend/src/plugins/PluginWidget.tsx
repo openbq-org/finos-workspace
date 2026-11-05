@@ -1,10 +1,18 @@
 import get from "lodash/get";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { callPluginBackend, callPluginProxy } from "~/api/plugins.api";
+import {
+  callPluginBackend,
+  callPluginProxy,
+  createPluginPreset,
+  listPluginPresets,
+  type PluginPreset,
+} from "~/api/plugins.api";
 import DraggableCard from "~/components/DraggableCard";
 import { ExternalLinkDialog } from "~/components/ExternalLinkDialog";
 import SearchResultsNotFound from "~/components/General/SearchResultsNotFound";
+import Icon from "~/components/Icon";
+import Tooltip from "~/components/Tooltip";
 import type { ParamDef, StoredParamValue } from "~/components/types";
 import { useWidgetContext } from "~/components/Widget.context";
 import { useWidgetParamsPositions } from "~/components/WidgetParams/QueryParams";
@@ -16,18 +24,28 @@ import {
 } from "~/components/Widgets/Helpers/RawRows";
 import { useParamGroupBindings } from "~/components/Widgets/Helpers/useParamGroupBindings";
 import { useJsonData } from "~/lib/api";
-import { useShallowAppStore } from "~/lib/state/app";
+import { useAppStore, useShallowAppStore } from "~/lib/state/app";
 import { useShallowThemeStore } from "~/lib/state/theme";
+import { LIMITS } from "~/lib/types/widgetsContract";
+import { cn, uuidv4 } from "~/lib/utils";
 import { sourceStreamHref } from "~/lib/utils/fetch";
 import { buildWidgetRequest } from "~/lib/utils/widgetRequest";
+import { useActionIcon } from "./actionIcon";
 import {
   assetPath,
+  type CardAction,
+  cardActions,
+  checkConfigWrite,
   checkStateWrite,
   coerceParamValue,
   commandPermission,
+  defaultPreset,
   exportFile,
   jsonSize,
+  presetError,
+  presetName,
   RateLimiter,
+  readAddedWidget,
   readExportOptions,
   safeFilename,
   safeLink,
@@ -39,22 +57,31 @@ import {
 import { BundleIntegrityError, loadAsset } from "./bundle";
 import { validateDefinition } from "./definition";
 import {
+  ACTION_GRANT_MS,
   MAX_CLIPBOARD_BYTES,
   MAX_COPILOT_CONTEXT_BYTES,
   MAX_NOTIFY_LENGTH,
   NOTIFY_LEVELS,
   NOTIFY_RATE,
+  PRESET_SAVE_RATE,
   SERVER_CALL_RATE,
 } from "./limits";
 import PluginFrame, { type FrameStatus, type PluginFrameHandle } from "./PluginFrame";
+import { PresetsPanel } from "./PresetsPanel";
 import { CommandError, MAX_EXPORT_BYTES } from "./protocol";
 import {
+  buildPluginArtifactWidget,
   resolvePluginWidget,
   resolveVizHandler,
   usePluginRegistryStore,
   useRowsPlugin,
 } from "./registry";
-import { cleanSettings, SettingsForm } from "./SettingsForm";
+import {
+  type CardDetails,
+  CardDetailsForm,
+  cleanSettings,
+  SettingsForm,
+} from "./SettingsForm";
 import { openStream, type Stream, webSocketUrl } from "./stream";
 import { readThemeTrait } from "./theme";
 import {
@@ -156,18 +183,23 @@ function PluginWidgetBody({
   viewName: string;
 }) {
   const { plugin, widget: pluginWidget, vizType } = resolved;
-  const { widget, updateWidget, activeDashboardId, isShared } = useWidgetContext();
+  const { widget, updateWidget, activeDashboardId, isShared, isPreview } =
+    useWidgetContext();
   const addWidget = useShallowAppStore((state) => state.addWidget);
   const theme = useShallowThemeStore((state) => state.theme);
   const frameRef = useRef<PluginFrameHandle>(null);
   const [status, setStatus] = useState<FrameStatus>({ kind: "booting" });
   const [link, setLink] = useState<string | null>(null);
   const [copilotContext, setCopilotContext] = useState<unknown>(undefined);
+  const actionGrant = useRef(0);
   const notifyLimiter = useRef(
     new RateLimiter(NOTIFY_RATE.perSecond, NOTIFY_RATE.burst),
   );
   const serverLimiter = useRef(
     new RateLimiter(SERVER_CALL_RATE.perSecond, SERVER_CALL_RATE.burst),
+  );
+  const presetLimiter = useRef(
+    new RateLimiter(PRESET_SAVE_RATE.perSecond, PRESET_SAVE_RATE.burst),
   );
   const { updateGroupedParams } = useParamGroupBindings();
 
@@ -401,12 +433,121 @@ function PluginWidgetBody({
           }));
           return next;
         }
+        case "config": {
+          const schema = pluginWidget.settings?.schema;
+          const merged = (stored: Record<string, unknown> | undefined) =>
+            checkConfigWrite(schema, cleanSettings(schema, stored), binding.key, value);
+          const next = merged(storagePlugin.config);
+          if (isShared)
+            throw new CommandError("unavailable", "a shared dashboard is read-only");
+          updateWidget((prev) => {
+            const plugin = prev.storage?.plugin as PluginInstanceStorage | undefined;
+            try {
+              return {
+                ...prev,
+                storage: {
+                  ...prev.storage,
+                  plugin: { ...plugin, config: merged(plugin?.config) },
+                },
+              };
+            } catch {
+              return prev;
+            }
+          });
+          return binding.key === undefined ? next : next[binding.key];
+        }
         default:
           throw new CommandError("not_granted", `${binding.trait} is read-only`);
       }
     },
-    [writeParams, paramValues, traits, updateWidget, isShared],
+    [
+      writeParams,
+      paramValues,
+      traits,
+      updateWidget,
+      isShared,
+      pluginWidget.settings,
+      storagePlugin.config,
+    ],
   );
+
+  const presetValues = useCallback(
+    (preset: Pick<PluginPreset, "config" | "state">) => {
+      const schema = pluginWidget.settings?.schema;
+      return {
+        config: checkConfigWrite(
+          schema,
+          {},
+          undefined,
+          cleanSettings(schema, preset.config ?? {}),
+        ),
+        state: checkStateWrite(preset.state ?? null),
+      };
+    },
+    [pluginWidget.settings],
+  );
+
+  const writePreset = useCallback(
+    (preset: Pick<PluginPreset, "config" | "state">) => {
+      const next = presetValues(preset);
+      updateWidget((prev) => ({
+        ...prev,
+        storage: {
+          ...prev.storage,
+          plugin: {
+            ...(prev.storage?.plugin as PluginInstanceStorage),
+            ...next,
+          },
+        },
+      }));
+    },
+    [presetValues, updateWidget],
+  );
+
+  const presetChecked = useRef(false);
+  useEffect(() => {
+    if (
+      presetChecked.current ||
+      isShared ||
+      isPreview ||
+      showRows ||
+      storagePlugin.config ||
+      storagePlugin.state !== undefined ||
+      storagePlugin.presetChecked
+    )
+      return;
+    presetChecked.current = true;
+    listPluginPresets(plugin.id, pluginWidget.id)
+      .then(({ presets }) => {
+        const preset = defaultPreset(presets);
+        return preset ? presetValues(preset) : {};
+      })
+      .catch(() => ({}))
+      .then((values) =>
+        updateWidget((prev) => {
+          const current = (prev.storage?.plugin ?? {}) as PluginInstanceStorage;
+          const untouched = !current.config && current.state === undefined;
+          return {
+            ...prev,
+            storage: {
+              ...prev.storage,
+              plugin: { ...current, ...(untouched ? values : {}), presetChecked: true },
+            },
+          };
+        }),
+      );
+  }, [
+    isShared,
+    isPreview,
+    showRows,
+    storagePlugin.config,
+    storagePlugin.state,
+    storagePlugin.presetChecked,
+    plugin.id,
+    pluginWidget.id,
+    presetValues,
+    updateWidget,
+  ]);
 
   const onCommand = useCallback(
     async (name: string, msg: unknown, buffers: ArrayBuffer[]) => {
@@ -443,6 +584,35 @@ function PluginWidgetBody({
         case "core:ui:open-link":
           setLink(safeLink(args.url));
           return {};
+        case "core:dashboard:add-widget": {
+          if (isShared || useAppStore.getState().isDashboardLocked(activeDashboardId))
+            throw new CommandError("unavailable", "the dashboard is read-only");
+          if (actionGrant.current < Date.now())
+            throw new CommandError(
+              "out_of_scope",
+              "a widget is added only right after the user picks one of the widget's actions",
+            );
+          const { target, data, name } = readAddedWidget(args, (id) =>
+            resolvePluginWidget({ id: plugin.id, widget: id }),
+          );
+          actionGrant.current = 0;
+          const added = await addWidget(
+            activeDashboardId,
+            buildPluginArtifactWidget(target, data, {
+              id: uuidv4(),
+              name: name ?? `${widget.name} (static)`.slice(0, LIMITS.name),
+              description: `A static copy of ${widget.name}`,
+              innerTab: widget.innerTab,
+              copiedFrom: { widgetUuid: widget.id, name: widget.name },
+            }),
+          );
+          if (!added)
+            throw new CommandError(
+              "unavailable",
+              "the dashboard did not take the widget",
+            );
+          return { value: { instanceId: added } };
+        }
         case "core:clipboard:write": {
           const text = String(args.text ?? "");
           if (text.length > MAX_CLIPBOARD_BYTES)
@@ -490,17 +660,69 @@ function PluginWidgetBody({
           });
           return { value: answer.body };
         }
+        case "core:presets:list":
+        case "core:presets:apply":
+        case "core:presets:save": {
+          if (isShared)
+            throw new CommandError("unavailable", "a shared dashboard is read-only");
+          if (name === "core:presets:save") {
+            const presetLabel = presetName(args.name);
+            if (!presetLimiter.current.take())
+              throw new CommandError("rate_limited", "too many presets saved");
+            const saved = await createPluginPreset(plugin.id, pluginWidget.id, {
+              name: presetLabel,
+              config,
+              state: storagePlugin.state ?? null,
+              is_default: args.isDefault === true,
+            }).catch((error) => {
+              throw presetError(error);
+            });
+            return { value: { id: saved.id } };
+          }
+          const { presets } = await listPluginPresets(plugin.id, pluginWidget.id).catch(
+            (error) => {
+              throw presetError(error);
+            },
+          );
+          if (name === "core:presets:list")
+            return {
+              value: {
+                presets: presets.map((preset) => ({
+                  id: preset.id,
+                  name: preset.name,
+                  scope: preset.scope,
+                  isDefault: preset.is_default,
+                })),
+              },
+            };
+          const preset = presets.find((p) => p.id === args.id);
+          if (!preset)
+            throw new CommandError(
+              "out_of_scope",
+              "no preset of this widget has that id",
+            );
+          writePreset(preset);
+          return { value: {} };
+        }
         default:
           throw new CommandError("unknown_command", `${name} is not a host command`);
       }
     },
     [
+      activeDashboardId,
+      addWidget,
+      config,
+      isShared,
       permissions,
       plugin,
       pluginWidget.id,
       pluginWidget.proxies,
       pluginWidget.routes,
       widget.id,
+      widget.innerTab,
+      widget.name,
+      storagePlugin.state,
+      writePreset,
     ],
   );
 
@@ -569,22 +791,133 @@ function PluginWidgetBody({
   }, [wantsCopilotContext, data]);
 
   const settingsSchema = pluginWidget.settings?.schema;
+  const hasSettings = Object.keys(settingsSchema?.properties ?? {}).length > 0;
   const [draft, setDraft] = useState<Record<string, unknown>>(config);
+  const [details, setDetails] = useState<CardDetails>({
+    name: widget.name ?? "",
+    description: widget.description ?? "",
+  });
+  const [presetState, setPresetState] = useState<{ state: unknown } | null>(null);
   useEffect(() => setDraft(config), [config]);
+  const resetSettings = useCallback(
+    (open: boolean) => {
+      if (!open) return;
+      setDraft(config);
+      setPresetState(null);
+      setDetails({ name: widget.name ?? "", description: widget.description ?? "" });
+    },
+    [config, widget.name, widget.description],
+  );
   const saveSettings = useCallback(() => {
     const next = cleanSettings(settingsSchema, draft);
     if (jsonSize(next) > MAX_CONFIG_BYTES) {
       toast.error("These settings are too large");
       return;
     }
+    let state: { state: unknown } | null = null;
+    try {
+      if (presetState) state = { state: checkStateWrite(presetState.state ?? null) };
+    } catch {
+      toast.error("The preset's state is too large");
+      return;
+    }
+    const name = details.name.trim().slice(0, LIMITS.name);
+    const description = details.description.trim().slice(0, LIMITS.description);
     updateWidget((prev) => ({
       ...prev,
+      name: name || prev.name,
+      description,
       storage: {
         ...prev.storage,
-        plugin: { ...(prev.storage?.plugin as PluginInstanceStorage), config: next },
+        plugin: {
+          ...(prev.storage?.plugin as PluginInstanceStorage),
+          config: next,
+          ...state,
+        },
       },
     }));
-  }, [draft, settingsSchema, updateWidget]);
+    setPresetState(null);
+  }, [details, draft, presetState, settingsSchema, updateWidget]);
+  const applyPreset = useCallback(
+    (preset: PluginPreset) => {
+      setDraft({
+        ...(pluginWidget.settings?.defaults ?? {}),
+        ...cleanSettings(settingsSchema, preset.config ?? {}),
+      });
+      setPresetState({ state: preset.state });
+    },
+    [pluginWidget.settings, settingsSchema],
+  );
+
+  const actions = useMemo(
+    () => cardActions(pluginWidget, permissions, plugin.files),
+    [pluginWidget, permissions, plugin.files],
+  );
+  const running = status.kind === "running";
+  const onAction = useCallback(
+    (action: CardAction) => {
+      if (!action.toggles) {
+        actionGrant.current = Date.now() + ACTION_GRANT_MS;
+        frameRef.current?.sendEvent({
+          kind: "workspace-event",
+          name: "action",
+          id: action.id,
+        });
+        return;
+      }
+      if (isShared) return;
+      const key = action.toggles;
+      const pressed = config[key] !== true;
+      updateWidget((prev) => {
+        const stored = prev.storage?.plugin as PluginInstanceStorage | undefined;
+        try {
+          const next = checkConfigWrite(
+            settingsSchema,
+            cleanSettings(settingsSchema, stored?.config),
+            key,
+            pressed,
+          );
+          return {
+            ...prev,
+            storage: { ...prev.storage, plugin: { ...stored, config: next } },
+          };
+        } catch {
+          return prev;
+        }
+      });
+      frameRef.current?.sendEvent({
+        kind: "workspace-event",
+        name: "action",
+        id: action.id,
+        pressed,
+      });
+    },
+    [config, isShared, settingsSchema, updateWidget],
+  );
+  const menuActions = useMemo(
+    () =>
+      actions.menu.map((action) => ({
+        id: `plugin-action-${action.id}`,
+        label: action.label,
+        icon: action.icon ?? ("widget" as const),
+        iconElement: <PluginActionIcon plugin={plugin} action={action} />,
+        hide: !running,
+        onClick: () => onAction(action),
+      })),
+    [actions.menu, onAction, plugin, running],
+  );
+  const navbarButtons = running
+    ? actions.buttons.map((action) => (
+        <PluginActionButton
+          key={action.id}
+          plugin={plugin}
+          action={action}
+          pressed={action.toggles ? config[action.toggles] === true : undefined}
+          disabled={!!action.toggles && isShared}
+          onClick={() => onAction(action)}
+        />
+      ))
+    : [];
 
   const { renderRow0Params, renderBelowNavbarRows } = useWidgetParamsPositions();
 
@@ -624,14 +957,20 @@ function PluginWidgetBody({
               : { data, context: copilotContext }
         }
         extraNavbarElements={
-          widget.raw ? (
-            <RowsToggle
-              showRows={showRows}
-              onChange={setShowRows}
-              viewName={viewName}
-            />
+          navbarButtons.length || widget.raw ? (
+            <>
+              {navbarButtons}
+              {widget.raw ? (
+                <RowsToggle
+                  showRows={showRows}
+                  onChange={setShowRows}
+                  viewName={viewName}
+                />
+              ) : null}
+            </>
           ) : undefined
         }
+        extraSettings={menuActions}
         lastUpdated={readsData ? dataUpdatedAt : undefined}
         loading={readsData && isLoading}
         error={readsData ? error : undefined}
@@ -639,15 +978,32 @@ function PluginWidgetBody({
         settings={{ overrideSettings: false, showExport: canExport }}
         onExport={canExport ? onExport : undefined}
         settingsModalChildren={
-          settingsSchema && Object.keys(settingsSchema.properties ?? {}).length ? (
-            <SettingsForm
-              schema={settingsSchema}
-              values={draft}
-              onChange={setDraft}
+          <>
+            <PresetsPanel
+              pluginId={plugin.id}
+              widgetId={pluginWidget.id}
+              config={cleanSettings(settingsSchema, draft)}
+              state={presetState ? presetState.state : storagePlugin.state}
+              onApply={applyPreset}
               disabled={isShared}
             />
-          ) : null
+            <CardDetailsForm
+              values={details}
+              onChange={setDetails}
+              disabled={isShared}
+            />
+            {settingsSchema && hasSettings ? (
+              <SettingsForm
+                schema={settingsSchema}
+                values={draft}
+                onChange={setDraft}
+                disabled={isShared}
+              />
+            ) : null}
+          </>
         }
+        showActionsSettings={!isShared}
+        setOpenSettings={resetSettings}
         onSaveSettings={saveSettings}
         keepMounted={true}
       >
@@ -697,6 +1053,52 @@ function PluginWidgetBody({
         onOpenInNewTab={(url) => window.open(url, "_blank", "noopener,noreferrer")}
       />
     </>
+  );
+}
+
+function PluginActionIcon({
+  plugin,
+  action,
+}: {
+  plugin: ResolvedPluginWidget["plugin"];
+  action: CardAction;
+}) {
+  const svg = useActionIcon(plugin, action.iconPath);
+  if (action.icon) return <Icon id={action.icon} className="h-3.5 w-3.5" />;
+  return (
+    <span
+      className="inline-flex h-3.5 w-3.5 [&>svg]:h-full [&>svg]:w-full"
+      data-plugin-icon={action.iconPath}
+      dangerouslySetInnerHTML={{ __html: svg ?? "" }}
+    />
+  );
+}
+
+function PluginActionButton(props: {
+  plugin: ResolvedPluginWidget["plugin"];
+  action: CardAction;
+  pressed?: boolean;
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  const { plugin, action, pressed, disabled, onClick } = props;
+  return (
+    <Tooltip message={action.label}>
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={disabled}
+        className={cn("ws-small-navbar-btn", {
+          "bg-brand-main! text-white! hover:bg-brand-main!": pressed,
+          "opacity-30": disabled,
+        })}
+        aria-label={action.label}
+        aria-pressed={pressed}
+        data-plugin-action={action.id}
+      >
+        <PluginActionIcon plugin={plugin} action={action} />
+      </button>
+    </Tooltip>
   );
 }
 

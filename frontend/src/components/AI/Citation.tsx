@@ -8,6 +8,7 @@ import { useShallowAppStore } from "~/lib/state/app";
 import {
   type Citation as CitationT,
   type DetailT,
+  useCopilotStore,
   useShallowCopilotStore,
 } from "~/lib/state/copilot";
 import { useShallowCopilotDataStore } from "~/lib/state/copilotData";
@@ -490,6 +491,11 @@ const Citation = forwardRef<HTMLDivElement, CitationProps>((props, _ref) => {
           uuid: artifact.uuid,
           name: artifact.name,
           description: artifact.description,
+        },
+        artifact: {
+          uuid: artifact.uuid,
+          name: artifact.name ?? "",
+          chatUuid: useCopilotStore.getState().getCurrentChat()?.uuid ?? "",
         },
       });
     } else {

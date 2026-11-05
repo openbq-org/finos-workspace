@@ -54,6 +54,7 @@ vi.mock("~/components/AI/hooks/mcp/mcpServerAuth", async (importOriginal) => ({
 
 vi.mock("~/api/auth.api", () => ({
   postMCPServers: vi.fn().mockResolvedValue({ status: 200 }),
+  fetchCopilotAccess: vi.fn().mockResolvedValue(null),
 }));
 
 const tokenOptions: UseMcpOptionsT = {

@@ -123,7 +123,7 @@ Optional. Pre-configures how a widget displays inside this app template. Common 
 
 ## MCP servers
 
-An app can declare MCP servers that belong to this backend. When the backend is connected, FINOS Workspace registers each one for the user, and a server whose `authType` is `token` is switched on only when the backend connection has an `Authorization` header. The backend's credentials are not sent to the server: the user connects it with headers of their own, or with an OAuth sign-in that asks for consent first, and their roles decide which tools the AI Agent may use.
+An app can declare MCP servers that belong to this backend. When the backend is connected, FINOS Workspace registers each one for the user, and a server whose `authType` is `token` is switched on only when the backend connection has an `Authorization` header. The backend's credentials are not sent to the server: the user connects it with headers of their own, or with an OAuth sign-in that asks for consent first. Whoever can use the backend may use every tool of its servers.
 
 ```json
 "mcpServers": [

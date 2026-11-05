@@ -74,6 +74,7 @@ type ExtraAction = {
   label: string;
   onClick?: () => void;
   icon: IconId;
+  iconElement?: ReactNode;
   id: string;
   hide?: boolean;
   tooltipMessage?: string;
@@ -647,12 +648,16 @@ const NavBar = forwardRef<HTMLDivElement, NavBarProps>(
     const createdAt = widgetRef?.current?.storage?.createdAt;
 
     const handleSettingsModal = useCallback(
-      (value: boolean) => {
-        dispatch({ settingsModal: value });
-        setOpenSettings?.(value);
-      },
-      [setOpenSettings],
+      (value: boolean) => dispatch({ settingsModal: value }),
+      [],
     );
+
+    const settingsModalOpen = state.settingsModal;
+    const notifySettings = useRef(setOpenSettings);
+    notifySettings.current = setOpenSettings;
+    useEffect(() => {
+      notifySettings.current?.(settingsModalOpen);
+    }, [settingsModalOpen]);
 
     const handleMetadataModal = useCallback(
       (value: boolean) => {

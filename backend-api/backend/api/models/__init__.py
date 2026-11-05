@@ -40,6 +40,7 @@ from .widget_plugin_models import (
     WidgetPlugin,
     WidgetPluginCspReport,
     WidgetPluginEvent,
+    WidgetPluginPreset,
     WidgetPluginSecret,
     WidgetPluginVersion,
 )

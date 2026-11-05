@@ -324,6 +324,26 @@ class TestPolicy:
         [plugin] = (await user_listing(member))["plugins"]
         assert plugin["widgets"][0]["permissions"] == ["core:data:read", "core:default"]
 
+    @pytest.mark.asyncio
+    async def test_the_listing_carries_the_actions_that_the_permissions_allow(self, member, superuser, plugins_dir):
+        data = manifest()
+        button = {"id": "zoom", "label": "Zoom in", "icon": "zoom-in", "placement": "navbar"}
+        item = {"id": "reset", "label": "Reset view", "icon": "refresh", "placement": "menu"}
+        data["contributes"]["widgets"][0].update(
+            {"permissions": ["core:data:read", "core:ui:button", "core:ui:menu"], "actions": [button, item]}
+        )
+        write_package(plugins_dir, data)
+        await rescan(superuser)
+        await approve(superuser)
+        await enable(superuser)
+        await grant(superuser)
+        [plugin] = (await user_listing(member))["plugins"]
+        assert plugin["widgets"][0]["actions"] == [button, item]
+
+        await enable(superuser, narrowed_permissions=["core:ui:menu"])
+        [plugin] = (await user_listing(member))["plugins"]
+        assert plugin["widgets"][0]["actions"] == [button]
+
 
 class TestFiles:
     async def _ready(self, member, superuser, plugins_dir):

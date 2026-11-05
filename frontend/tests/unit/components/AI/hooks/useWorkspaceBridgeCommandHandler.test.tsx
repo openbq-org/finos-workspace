@@ -6,6 +6,7 @@ const mockGetQueryFetchParams = vi.fn();
 const mockReadWidget = vi.fn();
 const mockCreateWidget = vi.fn();
 const mockUpdateWidget = vi.fn();
+const mockPluginConfig = vi.fn();
 const mockDeleteWidget = vi.fn();
 const mockCreateDashboard = vi.fn();
 const mockReadDashboard = vi.fn();
@@ -170,6 +171,7 @@ vi.mock("~/api/workspace.api", async (importOriginal) => ({
   readWidget: (...args: unknown[]) => mockReadWidget(...args),
   createWidget: (...args: unknown[]) => mockCreateWidget(...args),
   updateWidget: (...args: unknown[]) => mockUpdateWidget(...args),
+  pluginConfig: (...args: unknown[]) => mockPluginConfig(...args),
   deleteWidget: (...args: unknown[]) => mockDeleteWidget(...args),
   createDashboard: (...args: unknown[]) => mockCreateDashboard(...args),
   readDashboard: (...args: unknown[]) => mockReadDashboard(...args),
@@ -1334,6 +1336,34 @@ describe("useWorkspaceBridgeCommandHandler", () => {
       data: {
         dashboard_id: "dashboard-1",
         widget_uuid: "widget-instance-1",
+      },
+    });
+  });
+
+  it("answers an update of a plugin widget with the settings it now holds", async () => {
+    mockPluginConfig.mockReturnValueOnce({
+      latitude: 51.5072,
+      longitude: -0.1276,
+      zoom: 12,
+    });
+    const { result } = renderHook(() => useWorkspaceBridgeCommandHandler());
+
+    let response: Awaited<ReturnType<typeof result.current>> | undefined;
+    await act(async () => {
+      response = await result.current({
+        command: "update_widget",
+        dashboard_id: "dashboard-1",
+        widget_uuid: "widget-instance-1",
+        config: { ui_args: { name: "Offices" } },
+      });
+    });
+
+    expect(response).toMatchObject({
+      ok: true,
+      data: {
+        effective_ui_args: {
+          config: { latitude: 51.5072, longitude: -0.1276, zoom: 12 },
+        },
       },
     });
   });

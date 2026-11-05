@@ -440,6 +440,9 @@ export interface PluginsData {
   traits: string[];
   traitTable: { name: string; description: string; requires: string | null; writableWith: string | null }[];
   builtInTypes: string[];
+  actionIcons: string[];
+  actionIconTags: string[];
+  actionIconAttributes: string[];
   guestMessages: ProtocolMessage[];
   hostMessages: ProtocolMessage[];
   states: { plugin: PluginState[]; version: PluginState[] };

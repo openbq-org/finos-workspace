@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { subscribeWithSelector } from "zustand/middleware";
 import { useShallow } from "zustand/react/shallow";
 import { createWithEqualityFn } from "zustand/traditional";
-import { postMCPServers } from "~/api/auth.api";
+import { fetchCopilotAccess, postMCPServers } from "~/api/auth.api";
 import {
   deleteMcpOAuthGrant,
   sameMcpServerUrl,
@@ -13,7 +13,11 @@ import {
 import type { UseMcpResult } from "~/components/AI/hooks/mcp/useMcp";
 import { isRecord } from "~/components/AI/utils/mcpToolSchema";
 import type { Selector } from "./app";
-import { getCopilotAccess, isMcpToolAllowed } from "./copilotAccess";
+import {
+  getCopilotAccess,
+  isMcpToolAllowed,
+  useCopilotAccessStore,
+} from "./copilotAccess";
 import { getWorkspaceAgentTools } from "./workspaceTools";
 
 export const PENDING_CONNECTION_STATES = [
@@ -233,6 +237,8 @@ export const useMcpToolsStore = createWithEqualityFn<McpToolsState>()(
               : server;
           }),
         }));
+        const access = await fetchCopilotAccess();
+        if (access) useCopilotAccessStore.getState().setAccess(access);
       };
       serversSaved = serversSaved
         .then(save)

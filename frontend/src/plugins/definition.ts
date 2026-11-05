@@ -83,7 +83,7 @@ export function validateDefinition(
     }
     if (typeof node.$ref === "string") {
       const name = node.$ref.replace(/^#\/\$defs\//, "");
-      check(data, defs[name], path, depth + 1);
+      check(data, Object.hasOwn(defs, name) ? defs[name] : undefined, path, depth + 1);
       return;
     }
     if ("const" in node && !equal(data, node.const)) {
@@ -169,14 +169,14 @@ export function validateDefinition(
     if (isObject(data)) {
       const properties = isObject(node.properties) ? node.properties : {};
       for (const required of Array.isArray(node.required) ? node.required : []) {
-        if (!(String(required) in data))
+        if (!Object.hasOwn(data, String(required)))
           errors.push({
             path: pointer(path, String(required)),
             message: "is required",
           });
       }
       for (const [key, item] of Object.entries(data)) {
-        if (key in properties) {
+        if (Object.hasOwn(properties, key)) {
           check(item, properties[key], pointer(path, key), depth + 1);
         } else if (
           node.additionalProperties === false ||

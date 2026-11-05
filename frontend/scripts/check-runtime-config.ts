@@ -6,7 +6,9 @@ import { ENV_NAMES, RuntimeConfigSchema } from "../src/lib/runtimeConfigSchema.t
 type Config = Record<string, Record<string, unknown>>;
 type AppConfig = {
   FIELDS: [string, string, string, string][];
+  HEADER_FIELDS: [string, string][];
   render(env: Record<string, string>): string;
+  policy(env: Record<string, string>): string;
 };
 
 const appConfig: AppConfig = (await import(resolve(process.cwd(), "app-config.js"))).default;
@@ -67,12 +69,27 @@ for (const row of rows) {
 
 const nginxConf = readFileSync(resolve(process.cwd(), "nginx.conf"), "utf8");
 const passed = [...nginxConf.matchAll(/^env ([A-Z0-9_]+);$/gm)].map((match) => match[1]);
-for (const row of rows) {
-  if (!passed.includes(row.variable)) errors.push(`nginx.conf has no env ${row.variable};`);
+const headerVariables = appConfig.HEADER_FIELDS.map(([variable]) => variable);
+for (const variable of [...rows.map((row) => row.variable), ...headerVariables]) {
+  if (!passed.includes(variable)) errors.push(`nginx.conf has no env ${variable};`);
 }
 for (const name of passed) {
-  if (!rows.some((row) => row.variable === name)) {
+  if (!rows.some((row) => row.variable === name) && !headerVariables.includes(name)) {
     errors.push(`nginx.conf passes ${name}, which no field reads`);
+  }
+}
+for (const [variable, description] of appConfig.HEADER_FIELDS) {
+  if (!description.trim()) errors.push(`${variable} has no description`);
+}
+for (const [variable, value] of [
+  ["CSP_EXTRA_SOURCES", "script-src 'none'"],
+  ["CSP_EXTRA_SOURCES", "sandbox allow-scripts"],
+  ["CSP_REPORT_ONLY", "yes"],
+]) {
+  try {
+    appConfig.policy({ [variable]: value });
+    errors.push(`app-config.js accepted ${variable}=${value}`);
+  } catch {
   }
 }
 

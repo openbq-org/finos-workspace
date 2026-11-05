@@ -9,6 +9,8 @@ import {
   updateWidget,
 } from "~/api/workspace.api";
 import type { WidgetT } from "~/components/types";
+import { usePluginRegistryStore } from "~/plugins/registry";
+import type { AvailablePlugin } from "~/plugins/types";
 
 const mockGetAppWidget = vi.fn();
 const mockAddWidget = vi.fn();
@@ -356,6 +358,60 @@ describe("FINOS Workspace API", () => {
       expect(result?.data).toBe('<h1>Hi <img src="x" /></h1>');
     });
 
+    it("says a static copy is one, of which widget and from when, and returns its stored rows", () => {
+      const rows = { rowData: [{ region: "North", units: 120 }] };
+      const copy = createMockWidget({
+        id: widgetUuid,
+        widgetId: "plugin:ag-grid:table",
+        name: "Trades at close",
+        type: "custom",
+        params: [],
+        storage: {
+          createdAt: "2026-11-05T14:05:00.000Z",
+          copiedFrom: { widgetUuid: "source-uuid", name: "Trades SQL" },
+          plugin: { data: rows },
+        },
+      });
+      mockGetTabWidgetById.mockReturnValue(copy);
+      mockGetDashboardWidgetData.mockReturnValue(undefined);
+
+      const result = readWidget(dashboardId, widgetUuid);
+
+      expect(result).toEqual(
+        expect.objectContaining({
+          name: "Trades at close",
+          created_at: "2026-11-05T14:05:00.000Z",
+          copied_from: { widget_uuid: "source-uuid", name: "Trades SQL" },
+          data: rows,
+        }),
+      );
+    });
+
+    it("says which chat artifact a widget was made from", () => {
+      mockGetTabWidgetById.mockReturnValue(
+        createMockWidget({
+          id: widgetUuid,
+          storage: {
+            fromArtifact: { artifactUuid: "a-1", name: "Sales bars", chatUuid: "c-1" },
+          },
+        }),
+      );
+      mockGetDashboardWidgetData.mockReturnValue(undefined);
+      const result = readWidget(dashboardId, widgetUuid);
+      expect(result?.from_artifact).toEqual({
+        artifact_uuid: "a-1",
+        name: "Sales bars",
+      });
+      expect(JSON.stringify(result)).not.toContain("c-1");
+    });
+
+    it("leaves out copy fields for a widget that is not a copy", () => {
+      mockGetDashboardWidgetData.mockReturnValue(undefined);
+      const result = readWidget(dashboardId, widgetUuid);
+      expect(result).not.toHaveProperty("copied_from");
+      expect(result).not.toHaveProperty("created_at");
+    });
+
     it("prefers rendered copilot data over the stored note text", () => {
       const noteWidget = createMockWidget({
         id: widgetUuid,
@@ -369,6 +425,42 @@ describe("FINOS Workspace API", () => {
       const result = readWidget(dashboardId, widgetUuid);
 
       expect(result?.data).toBe("rendered");
+    });
+
+    it("gives a plugin widget's settings as ui_args.config, as they are now", () => {
+      usePluginRegistryStore.setState({
+        plugins: [
+          {
+            id: "map-widget",
+            widgets: [
+              {
+                id: "map",
+                settings: {
+                  schema: {
+                    properties: {
+                      zoom: { type: "number", minimum: 0, maximum: 19 },
+                      latitude: { type: "number", minimum: -90, maximum: 90 },
+                    },
+                  },
+                  defaults: {},
+                },
+              },
+            ],
+          } as unknown as AvailablePlugin,
+        ],
+      });
+      mockGetTabWidgetById.mockReturnValue(
+        createMockWidget({
+          id: widgetUuid,
+          plugin: { id: "map-widget", widget: "map" },
+          storage: { plugin: { config: { zoom: 12, latitude: 48.85, stray: 1 } } },
+        }),
+      );
+
+      expect(readWidget(dashboardId, widgetUuid)?.ui_args).toEqual({
+        config: { zoom: 12, latitude: 48.85 },
+      });
+      usePluginRegistryStore.getState().clear();
     });
   });
 

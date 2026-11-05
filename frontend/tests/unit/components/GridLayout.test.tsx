@@ -443,6 +443,24 @@ describe("GridLayout", () => {
       expect(lastCall.layouts.xxs[0].h).toBe(12);
     });
 
+    it("does not grow a widget past its maxH for mobile layouts", () => {
+      const mockLayouts = [{ i: "nav", x: 0, y: 0, w: 40, h: 2, minH: 2, maxH: 2 }];
+
+      mockUseTabContext.mockReturnValue({
+        ...defaultTabContextValue,
+        layouts: mockLayouts,
+      });
+
+      render(
+        <GridLayout>
+          <div>Content</div>
+        </GridLayout>,
+      );
+
+      const lastCall = nthLastCall(mockResponsiveGridLayout)[0];
+      expect(lastCall.layouts.xxs[0].h).toBe(2);
+    });
+
     it("returns original layouts for empty array", () => {
       mockUseTabContext.mockReturnValue({
         ...defaultTabContextValue,

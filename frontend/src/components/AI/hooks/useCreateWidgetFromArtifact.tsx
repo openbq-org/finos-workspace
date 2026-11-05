@@ -13,8 +13,8 @@ import { useShallowThemeStore } from "~/lib/state/theme";
 import { generateRandomName } from "~/lib/utils";
 import { HTML_SANITIZE_CONFIG } from "~/lib/utils/sanitize";
 import { scrollToAndHighlightWidget } from "~/lib/utils/widgetHighlight";
-import { pluginWidgetId, resolvePluginWidget } from "~/plugins/registry";
-import type { ParamDef, WidgetJsonT, WidgetT } from "../../types";
+import { buildPluginArtifactWidget, resolvePluginWidget } from "~/plugins/registry";
+import type { WidgetJsonT, WidgetT } from "../../types";
 import {
   createConversationContextPayload,
   getFallbackName,
@@ -38,6 +38,7 @@ export type CreateWidgetParams = {
     description?: string;
     [key: string]: unknown;
   } | null;
+  artifact?: { uuid: string; name: string; chatUuid: string };
 };
 
 async function handleCreateMetaDataWidget(widget: WidgetJsonT | WidgetT) {
@@ -159,7 +160,7 @@ export function useCreateWidgetFromArtifact() {
         : widget;
       if (id) {
         const widgetUuid = await addWidget(id, newWidget);
-        return { widgetUuid, widgetId: newWidget.widgetId };
+        return { widgetUuid, widgetId: newWidget.widgetId, dashboardId: id };
       }
 
       const tabId = uuidv4();
@@ -173,7 +174,11 @@ export function useCreateWidgetFromArtifact() {
       });
       setTimeout(() => navigate(`/app/${tabId}`));
 
-      return { widgetUuid: newWidget.id, widgetId: newWidget.widgetId };
+      return {
+        widgetUuid: newWidget.id,
+        widgetId: newWidget.widgetId,
+        dashboardId: tabId,
+      };
     },
     [addWidget, addTab, id, navigate],
   );
@@ -183,8 +188,14 @@ export function useCreateWidgetFromArtifact() {
       params: CreateWidgetParams,
       widgetInfo: { name: string; description: string },
     ): Promise<{ widgetUuid?: string; widgetId?: string } | null> => {
-      const { widgetType, content } = params;
+      const { widgetType, content, artifact } = params;
       const { name: widgetName, description: widgetDescription } = widgetInfo;
+      const createdAt = new Date().toISOString();
+      const fromArtifact = artifact && {
+        artifactUuid: artifact.uuid,
+        name: artifact.name,
+        chatUuid: artifact.chatUuid,
+      };
 
       const widgetUuid = uuidv4();
       const widget = {
@@ -199,53 +210,60 @@ export function useCreateWidgetFromArtifact() {
         external: false,
       } as WidgetJsonT;
 
+      let built: WidgetJsonT | WidgetT;
+      let saveMetadata = false;
       if (widgetType === "text") {
         const contentStr = typeof content === "string" ? content : "";
-        const text = removeCitationsFromText(contentStr);
-
         widget.widgetId = "markdown";
         widget.type = "custom";
-        widget.storage = { text };
-
-        return await widgetCreation(widget, { saveMetadata: false });
-      }
-
-      if (widgetType === "html") {
+        widget.storage = {
+          text: removeCitationsFromText(contentStr),
+          createdAt,
+          ...(fromArtifact ? { fromArtifact } : {}),
+        };
+        built = widget;
+      } else if (widgetType === "html") {
         const contentStr = typeof content === "string" ? content : "";
-
         widget.widgetId = `html-${widgetUuid}`;
         widget.storage = {
           html: DOMPurify.sanitize(contentStr, {
             ...HTML_SANITIZE_CONFIG,
             WHOLE_DOCUMENT: true,
           }),
+          createdAt,
+          ...(fromArtifact ? { fromArtifact } : {}),
         };
-
-        return await widgetCreation(widget);
-      }
-      if (widgetType === "plugin" && params.pluginArtifact) {
+        built = widget;
+        saveMetadata = true;
+      } else if (widgetType === "plugin" && params.pluginArtifact) {
         const { plugin, data, config } = params.pluginArtifact;
         const found = resolvePluginWidget(plugin);
         if (!found) throw new Error("This plugin component is not available to you");
-        const { h, minW, minH } = found.widget.grid;
-        widget.widgetId = pluginWidgetId(plugin.id, plugin.widget);
-        widget.type = "custom";
-        widget.connectionType = "plugin";
-        widget.plugin = plugin;
-        widget.params = found.widget.params as unknown as ParamDef[];
-        widget.gridData = {
-          w: 40,
-          h: Math.max(h, 12),
-          ...(minW ? { minW } : {}),
-          ...(minH ? { minH } : {}),
-        };
-        widget.storage = { plugin: { data, ...(config ? { config } : {}) } };
-
-        return await widgetCreation(widget, { saveMetadata: false });
+        built = buildPluginArtifactWidget(found, data, {
+          id: widgetUuid,
+          name: widgetName,
+          description: widgetDescription,
+          innerTab,
+          config,
+          fromArtifact,
+        });
+      } else {
+        throw new Error("Invalid widget type");
       }
-      throw new Error("Invalid widget type");
+
+      const created = await widgetCreation(built, { saveMetadata });
+      if (artifact?.chatUuid && created?.widgetUuid)
+        useCopilotStore
+          .getState()
+          .recordArtifactWidget(artifact.chatUuid, artifact.uuid, {
+            widgetUuid: created.widgetUuid,
+            dashboardId: created.dashboardId,
+            name: widgetName,
+            createdAt,
+          });
+      return created;
     },
-    [id, innerTab, widgetCreation],
+    [innerTab, widgetCreation],
   );
 
   const createWidget = useCallback(

@@ -69,6 +69,26 @@ These settings brand the app: its name, logos, favicon, description and keywords
 
 <WebConfigTable group="whiteLabel" />
 
+## Content-Security-Policy
+
+The web container sends a `Content-Security-Policy` header with the app, built by `app-config.js` from the same environment. It allows:
+
+- scripts only from the app itself, plus `blob:` and the hash of the plugin frame shell, with `'unsafe-eval'` and `'wasm-unsafe-eval'`, which the app's schema validation and code highlighting need. When `ALLOW_HTML_JS_EXECUTION` is `true`, it also allows `'unsafe-inline'` and `https:` scripts, because HTML widgets run the scripts of the HTML that a backend returns.
+- connections to the app, to the origins of `BACKEND_URL` and `AI_API_URL`, to the API's WebSockets, and to any `https:` or `wss:` address, which agents, data connections and approved plugins use.
+- images, fonts, media and frames from the app, `data:`, `blob:` and any `https:` address, plus the origins of the API, of the white-label images and of the `WL_STYLESHEET` stylesheet, and frames on `localhost`, `127.0.0.1` and `0.0.0.0`.
+- Google's sign-in script, styles and frames only when `AUTHENTICATION_IDENTITY_PROVIDERS` includes `google`.
+
+It sets `object-src 'none'`, `base-uri 'none'`, `form-action 'self' https:`, `worker-src 'self' blob:` and `frame-ancestors 'self'`, so no other site can frame the app. Frames that the app builds itself, plugin frames, artifacts and HTML widgets, inherit this policy in addition to their own.
+
+Two variables adjust it:
+
+| Variable | What it does |
+|---|---|
+| `CSP_EXTRA_SOURCES` | Sources to add, written like a policy: directives separated by semicolons, each followed by its sources, for example `script-src https://cdn.plugins.example.com; frame-ancestors https://portal.example.com`. Add the hosts that an approved plugin loads scripts from, an `http:` host that the app reaches directly, or a portal that frames the app. A source cannot be `'none'`, and only the directives of the policy can be named. |
+| `CSP_REPORT_ONLY` | `true` sends the policy as `Content-Security-Policy-Report-Only`, so the browser reports what it would block in its console without blocking it. Use it to try the policy with your plugins and backends first. Must be `true` or `false`. |
+
+When either variable is invalid, the container sends `default-src 'none'`, which stops the app from loading, logs the error, and `/healthz` answers 500, so a mistake never leaves the app without a policy. The development server, `npm run dev`, sends no policy.
+
 ## Variables of the build
 
 Three variables are read when the app is built and are not settings: no variable of the container takes their place, and `config.js` cannot change them. Like the build variables above, they come from the `VITE_` variables of the build environment, such as `frontend/.env`. The table is generated from `runtimeConfigSchema.ts`, and a test fails when the code reads a `VITE_` variable that is neither a setting nor in this table.

@@ -87,7 +87,7 @@ The host builds the frame's document as a string and sets it as the frame's `src
 
 Three details:
 
-- A `srcdoc` frame also inherits the policy of the FINOS Workspace page itself. The web app sets no policy of its own, so a deployment that adds one must allow `blob:` and `data:` for frames.
+- A `srcdoc` frame also inherits the policy of the FINOS Workspace page itself, which the web container sends as described in [Web app configuration](../configuration/web-app.mdx#content-security-policy). That policy allows the shell by the same hash, `blob:` and `data:`, and `https:` for images, fonts, media, frames and connections. A plugin source that it does not allow, such as a remote script host or an `http:` host, has to be added to `CSP_EXTRA_SOURCES` as well as approved for the plugin.
 - A policy in a meta element cannot carry `report-uri` or `frame-ancestors`. Reports therefore come from violation events instead.
 - Removing the meta element at run time does not lift the policy. This was checked in Chromium, Firefox and WebKit.
 

@@ -23,6 +23,46 @@ export function gridRows(result) {
   return result.rows.map((row) => Object.fromEntries(row.map((value, i) => [String(i), value])));
 }
 
+const MAX_STATIC_ROWS = 1000;
+const MAX_STATIC_COLUMNS = 60;
+const MAX_STATIC_TEXT = 500;
+const MAX_STATIC_BYTES = 380_000;
+
+const byteSize = (value) => new TextEncoder().encode(JSON.stringify(value)).byteLength;
+
+function staticValue(value) {
+  if (value === null || value === undefined) return null;
+  if (typeof value === "number" || typeof value === "boolean") return value;
+  const text = typeof value === "object" ? JSON.stringify(value) : String(value);
+  return text.slice(0, MAX_STATIC_TEXT);
+}
+
+export function staticTableData(result) {
+  const columnDefs = gridColumns(result)
+    .slice(0, MAX_STATIC_COLUMNS)
+    .map(({ field, headerName, type }) => ({
+      field,
+      headerName: String(headerName).slice(0, 100),
+      ...(type ? { type } : {}),
+    }));
+  const fields = columnDefs.map((column) => column.field);
+  let budget = MAX_STATIC_BYTES - byteSize({ columnDefs, rowData: [] });
+  const rowData = [];
+  for (const row of gridRows(result).slice(0, MAX_STATIC_ROWS)) {
+    const copy = Object.fromEntries(fields.map((field) => [field, staticValue(row[field])]));
+    budget -= byteSize(copy) + 1;
+    if (budget < 0) break;
+    rowData.push(copy);
+  }
+  return { columnDefs, rowData };
+}
+
+async function onAction(message, { lastRun, invoke, signal }) {
+  if (message.id !== "freeze") return;
+  if (!lastRun?.result) throw new Error("Run a query first, then create a static widget of its result.");
+  await invoke("core:dashboard:add-widget", { widget: "table", data: staticTableData(lastRun.result) }, { signal });
+}
+
 let ready = Promise.resolve();
 
 async function showGrid(host, result, mode) {
@@ -38,7 +78,7 @@ async function showGrid(host, result, mode) {
   };
 }
 
-const widget = createWidget({ showGrid });
+const widget = createWidget({ showGrid, onAction });
 
 export default {
   initialize({ model }) {

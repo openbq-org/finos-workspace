@@ -13,7 +13,7 @@ An MCP server gives the Agent more tools: it can search a knowledge base, query 
 
 You need an account of type Admin or Developer, because a User cannot add servers, and the address of the server's MCP endpoint. FINOS Workspace supports servers that speak streamable HTTP only, and it does not support servers that run as a local process over stdio or that use the older SSE transport.
 
-The Agent can use a tool only when one of your roles grants it, so a connected server is useless to you until an admin grants its tools, as [Choose the models and tools of a role](../administration/choose-the-models-and-tools-of-a-role.md) describes. Every user already has the servers that the deployment adds for everyone, such as Agent Tools, and the apps of a backend can bring servers along, which FINOS Workspace adds when you connect the backend.
+The Agent can use every tool of a server that you add yourself, because adding the server is the approval, as connecting a backend of your own is. A server does not have to belong to a backend. Every user already has the servers that the deployment adds for everyone, such as Agent Tools, and a backend can bring servers along in two ways: the `mcpServers` of its apps, which FINOS Workspace adds when you connect the backend, and the `storage.mcpUrl` of an `iframe` widget, which FINOS Workspace connects for the widget, as [Link a widget to an MCP tool](../../tutorials/build-a-backend/link-a-widget-to-an-mcp-tool.md) describes. Whoever can use the backend can use every tool of those servers. The tools of any other server work for you only when one of your roles grants them, as [Choose the models and tools of a role](../administration/choose-the-models-and-tools-of-a-role.md) describes.
 
 ## Add the server
 

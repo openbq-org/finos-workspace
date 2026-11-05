@@ -2,9 +2,7 @@ name: Backend checks
 
 on:
   pull_request:
-    paths:
-      - "backend-api/backend/**"
-      - ".github/workflows/backend-checks.yml"
+  merge_group:
   workflow_dispatch:
 
 concurrency:

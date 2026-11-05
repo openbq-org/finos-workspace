@@ -49,7 +49,7 @@ The model holds the widget's traits. A trait is a named value that is bound to s
 | `model.save_changes()` | It sends the changed traits that are bound and writable. The host echoes back what it accepted. A refused write is echoed with the previous value, which fires `change:` again. |
 | `model.on(event, callback)` and `model.off(event?, callback?)` | They add and remove listeners. The callbacks of `change:<name>` receive no arguments. Calling `off()` removes every listener, and `off(event)` removes the listeners of that event. |
 | `model.send(content, callbacks, buffers)` | It sends a message to the host. The host answers only anywidget's own `invoke` message, which has `kind: "anywidget-command"`, and it answers with a `msg:custom` event that has the same `id`. The host drops every other message. |
-| `model.on("msg:custom", (content, buffers) => ...)` | It receives host events. The host sends `{ kind: "workspace-event", name: "refresh" }` when the user refreshes the widget, and `{ kind: "workspace-event", name: "visibility", visible }` when the widget becomes visible or hidden. |
+| `model.on("msg:custom", (content, buffers) => ...)` | It receives host events. The host sends `{ kind: "workspace-event", name: "refresh" }` when the user refreshes the widget, `{ kind: "workspace-event", name: "visibility", visible }` when the widget becomes visible or hidden, and `{ kind: "workspace-event", name: "action", id }` when the user picks one of the widget's [actions](package-and-manifest.mdx#actions), with `pressed` when the action toggles a setting. |
 
 When the manifest has no `model.traits` entry, the model offers these traits: <PluginList of="traits" />.
 
@@ -61,7 +61,9 @@ A module that already uses other trait names can keep them by binding them in th
 "model": { "traits": { "rows": { "bind": "data" }, "filter": { "bind": "param:filter", "access": "readwrite" } } }
 ```
 
-A binding names one of the traits above, or it has the form `param:<name>`, `config:<key>` or `adminSettings:<key>`. Only `params`, `param:<name>` and `state` can be `readwrite`. A trait without a binding exists only inside the frame.
+A binding names one of the traits above, or it has the form `param:<name>`, `config:<key>` or `adminSettings:<key>`. Only `params`, `param:<name>`, `state`, `config` and `config:<key>` can be `readwrite`. A trait without a binding exists only inside the frame.
+
+A write to `config` or `config:<key>` needs the permission `core:config:write`. The host takes only settings that the widget declares, with values that satisfy the setting, and it saves them with the dashboard. The AI agent reads the same settings with `read_widget`, as `ui_args.config`, and sets them with `update_widget`, so a setting that the module writes is one value that the user, the module and the agent share.
 
 ### Rows
 
@@ -94,6 +96,14 @@ A widget may offer at most <PluginValue of="limits.MAX_EXPORT_OPTIONS" /> option
 The host calls `copilotContext` when the user asks the AI agent about the dashboard, provided that the widget has the permission `core:copilot:context`. The result may be at most <PluginValue of="limits.MAX_COPILOT_CONTEXT_BYTES" unit="bytes" />, and the function has <PluginValue of="limits.EXPORT_TIMEOUTS_MS.copilotContext" unit="ms" /> to produce it.
 
 A module that returns exports from `initialize` cannot return a cleanup function as well, so it performs its cleanup through `signal`.
+
+## Presets
+
+A preset is a named combination of a widget's settings, which the module sees as `config`, and its own state, which it sees as `state`. The user saves presets of a plugin widget in the card's Settings and applies them to any card of the same widget on any of their dashboards. An organization admin publishes presets for the whole organization, which its users apply but cannot change. A preset's settings must satisfy the widget's `settings`, and its state may hold at most <PluginValue of="limits.maxStateBytes" unit="bytes" /> of JSON.
+
+Each user can mark one of their presets as their default for a widget, and an admin can mark one organization preset as the organization's default. A new card of the widget starts from the user's default, or else from the organization's default.
+
+A module with the permission `core:presets` can use presets itself, with the commands `core:presets:list`, `core:presets:apply` and `core:presets:save` that [Plugin permissions and commands](commands-and-permissions.mdx#commands) describes. Applying a preset changes `config` and `state`, so the module receives the new values of the traits bound to them, as when the user saves the Settings. The Settings presets work for every plugin widget without the permission.
 
 ## Errors and budgets
 

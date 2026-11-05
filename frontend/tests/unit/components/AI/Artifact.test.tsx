@@ -67,6 +67,7 @@ describe("Artifact Component", () => {
         config: { color: "red" },
       },
       metadata: { uuid: "p1", name: "Sales bars", description: "Sales by month" },
+      artifact: { uuid: "p1", name: "Sales bars", chatUuid: expect.any(String) },
     });
 
     fireEvent.click(screen.getByTestId("copy-plugin-artifact-button"));
@@ -97,6 +98,11 @@ describe("Artifact Component", () => {
         uuid: "123",
         name: "Test Text Artifact",
         description: "This is a test text artifact",
+      },
+      artifact: {
+        uuid: "123",
+        name: "Test Text Artifact",
+        chatUuid: expect.any(String),
       },
     });
   });

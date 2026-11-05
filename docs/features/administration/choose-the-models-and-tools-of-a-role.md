@@ -27,7 +27,7 @@ A role that grants no model of an agent does not let its members use that agent.
 
 The section MCP servers and tools lists the MCP servers that you know in your own workspace, such as the servers every user has by default. For each server you can select All tools, or select tools one by one.
 
-A tool that no role grants is not offered to the Agent, and the FINOS Workspace refuses a call to it. If the section says to add an MCP server to your own workspace to choose its tools here, the server has to be connected in your account before its tools appear in the list.
+A tool that no role grants is not offered to the Agent, and the FINOS Workspace refuses a call to it. The exceptions are the tools of a server that a person of type Admin or Developer added in their own account, and of a server that a backend the person can use declares: the person may use every tool of those servers without a role. If the section says to add an MCP server to your own workspace to choose its tools here, the server has to be connected in your account before its tools appear in the list.
 
 ## Save
 
@@ -37,4 +37,4 @@ Select Save. The change takes effect on the members' next question, because the 
 
 A new organization starts with a role named Agent User that grants All models of the default agent and All tools of the deployment's default MCP servers. Every new user receives it. To limit the Agent for an organization, either edit Agent User or remove it from the people who should have less, and grant the models and tools through other roles.
 
-[Agent and MCP server](../../reference/configuration/agent.mdx) lists the settings that decide which models exist. A person may use the models and tools that any one of their roles grants, and nothing else.
+[Agent and MCP server](../../reference/configuration/agent.mdx) lists the settings that decide which models exist. A person may use the models that any one of their roles grants, and nothing else. A person may use the tools that any one of their roles grants, and the tools of the servers that they added themselves or that a backend they can use declares.

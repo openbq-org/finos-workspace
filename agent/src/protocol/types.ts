@@ -79,6 +79,8 @@ export interface AgentTool {
 interface DashboardWidgetInfo {
   widget_uuid: string;
   name?: string;
+  copied_from?: { widget_uuid: string; name: string; created_at?: string };
+  from_artifact?: { artifact_uuid: string; name: string; created_at?: string; in_current_chat?: boolean };
 }
 
 interface DashboardTab {

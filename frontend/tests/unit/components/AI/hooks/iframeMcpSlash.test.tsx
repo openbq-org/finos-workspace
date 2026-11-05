@@ -4,7 +4,10 @@ import { useMcpToolSuggestions } from "~/components/AI/hooks/useMcpToolSuggestio
 import { useCopilotAccessStore } from "~/lib/state/copilotAccess";
 import { type McpConnection, useMcpToolsStore } from "~/lib/state/mcpTools";
 
-vi.mock("~/api/auth.api", () => ({ postMCPServers: vi.fn().mockResolvedValue({}) }));
+vi.mock("~/api/auth.api", () => ({
+  postMCPServers: vi.fn().mockResolvedValue({}),
+  fetchCopilotAccess: vi.fn().mockResolvedValue(null),
+}));
 vi.mock("sonner", () => ({
   toast: { warning: vi.fn(), error: vi.fn(), success: vi.fn() },
 }));

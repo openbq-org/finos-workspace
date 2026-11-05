@@ -99,7 +99,7 @@ A widget can name the MCP tool of its own backend that the AI Agent uses to quer
 - `mcp_server` is the `name` of a server in the `mcpServers` of this backend's `apps.json` (`workspace://specs/apps-json`), compared exactly; never a URL. A widget whose `mcp_server` names no declared server is refused, so a backend with no `apps.json` cannot use the key.
 - `tool_id` is the tool's name on that server, compared exactly.
 - `args` maps the tool's arguments to the widget's params: `"$<paramName>"` is the param's current value, which must be declared, and anything else is a literal. Without `args`, an argument named like a param takes its value.
-- The link enables nothing: the agent is told of it only while the tool is in its tool list (the server connected and enabled, the tool switched on, granted by the user's roles, and MCP tools on for the agent).
+- The link enables nothing: the agent is told of it only while the tool is in its tool list (the server connected and enabled, the tool switched on, granted to the user, and MCP tools on for the agent).
 - When the agent calls the tool, the result is cited as this widget, with the call's arguments turned back into its params through `args`. Several widgets may name one tool: the one whose literal `args` all equal the call's, with the most literals, is cited.
 - A widget with `disableRetrievalForCopilot: true` cannot have `mcp_tool`.
 - The server decides what a call may do; make the tool a read-only query.

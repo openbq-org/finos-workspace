@@ -17,6 +17,7 @@ vi.mock("~/lib/utils/widget", () => ({
 
 vi.mock("~/api/auth.api", () => ({
   postMCPServers: vi.fn().mockResolvedValue({}),
+  fetchCopilotAccess: vi.fn().mockResolvedValue(null),
 }));
 
 const createMockServer = (overrides: Partial<McpServer> = {}): McpServer => ({

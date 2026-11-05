@@ -10,7 +10,10 @@ import Icon from "~/components/Icon";
 import Tooltip from "~/components/Tooltip";
 import { useWidgetContext } from "~/components/Widget.context";
 
-pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+  "pdfjs-dist/build/pdf.worker.min.mjs",
+  import.meta.url,
+).toString();
 
 export type Highlight = {
   x: number;

@@ -297,15 +297,36 @@ PERMISSION_MEANINGS = {
         "and the host coerces each value to the type of its parameter."
     ),
     "core:state:write": "Writing to state.",
+    "core:config:write": (
+        "Writing to config and to config:<key>. Only the settings that the widget declares can be written, "
+        "and each value must satisfy its setting."
+    ),
     "core:copilot:context": "Letting the host call the module's copilotContext() function.",
     "core:export:provide": "Letting the Export entry call the module's exportOptions() and exportData() functions.",
     "core:ui:notify": "Showing the user a notice, with the command core:ui:notify.",
     "core:ui:open-link": "Opening a link after the user confirms, with the command core:ui:open-link.",
+    "core:ui:button": (
+        "Putting the navbar buttons that the widget declares in its actions in the card's header, "
+        "and receiving an action event when the user clicks one."
+    ),
+    "core:dashboard:add-widget": (
+        "Adding one of the plugin's own widgets that declares an artifact to the dashboard, with data that satisfies "
+        "the artifact's schema, with the command core:dashboard:add-widget. The host takes it only right after "
+        "the user picks one of the widget's actions that toggles nothing, and never on a shared dashboard."
+    ),
+    "core:ui:menu": (
+        "Putting the menu items that the widget declares in its actions in the card's options menu, "
+        "and receiving an action event when the user picks one."
+    ),
     "core:clipboard:write": "Copying text to the clipboard, with the command core:clipboard:write.",
     "core:download:save": "Saving a file for the user, with the command core:download:save.",
     "core:proxy:call": "Calling a proxy that the widget declares, with the command core:proxy:call.",
     "core:backend:call": (
         "Calling a route of the plugin's backend that the widget declares, with the command core:backend:call."
+    ),
+    "core:presets": (
+        "Listing, applying and saving the user's presets of the widget, with the commands core:presets:list, "
+        "core:presets:apply and core:presets:save."
     ),
 }
 
@@ -349,9 +370,7 @@ VERSION_STATES = {
 
 def _states(prefix: str, descriptions: dict[str, str]) -> list[dict[str, str]]:
     values = [
-        value
-        for name, value in vars(widget_plugin_models).items()
-        if name.startswith(prefix) and isinstance(value, str)
+        value for name, value in vars(widget_plugin_models).items() if name.startswith(prefix) and isinstance(value, str)
     ]
     unknown = sorted(set(values) - set(descriptions))
     unused = sorted(set(descriptions) - set(values))
@@ -395,6 +414,9 @@ def collect_widget_plugins() -> dict[str, Any]:
         "permissions": _permissions(),
         "permissionsLater": sorted(plugin_manifest.PERMISSIONS_LATER),
         "builtInTypes": sorted(plugin_manifest.BUILT_IN_TYPES),
+        "actionIcons": sorted(plugin_manifest.ACTION_ICONS),
+        "actionIconTags": sorted(plugin_manifest.ACTION_ICON_TAGS),
+        "actionIconAttributes": sorted(plugin_manifest.ACTION_ICON_ATTRIBUTES),
         "traits": list(plugin_manifest.TRAITS),
         "patterns": {
             "pluginId": plugin_manifest.PLUGIN_ID_PATTERN,

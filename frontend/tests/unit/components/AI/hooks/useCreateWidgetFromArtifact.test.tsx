@@ -171,10 +171,91 @@ describe("useCreateWidgetFromArtifact", () => {
           plugin: { id: "chart-kit", widget: "bars" },
           gridData: { w: 40, h: 12 },
           storage: {
+            createdAt: expect.any(String),
             plugin: { data: { rows: [{ x: "a", y: 1 }] }, config: { color: "red" } },
           },
         }),
       );
+    });
+
+    it("records the chat artifact a widget was made from, and the widget on that artifact", async () => {
+      usePluginRegistryStore.getState().setListing(
+        PluginListingSchema.parse({
+          enabled: true,
+          etag: "1",
+          plugins: [
+            {
+              id: "chart-kit",
+              version: "1.0.0",
+              name: "Chart kit",
+              digest: `sha256-${"A".repeat(43)}`,
+              entry: { module: "entry.js", styles: [] },
+              files: { "entry.js": { size: 10, sha256: "a".repeat(64) } },
+              csp: {},
+              widgets: [
+                {
+                  id: "bars",
+                  name: "Bars",
+                  permissions: ["core:data:read"],
+                  artifact: { description: "Bars", data: { type: "object" } },
+                },
+              ],
+            },
+          ],
+        }),
+      );
+      const artifact = {
+        uuid: "artifact-1",
+        type: "plugin" as const,
+        name: "Sales bars",
+        plugin: { id: "chart-kit", widget: "bars" },
+        data: { rows: [] },
+      };
+      useCopilotStore.setState({
+        currentChat: 1,
+        chats: [
+          {
+            uuid: "chat-1",
+            createdAt: 1,
+            label: "",
+            messages: [],
+            artifacts: [artifact],
+          },
+        ],
+      } as never);
+      mockAddWidget.mockResolvedValue("widget-new");
+      const { result } = renderHook(() => useCreateWidgetFromArtifact());
+
+      await act(async () => {
+        await result.current.createWidget({
+          widgetType: "plugin",
+          content: "",
+          pluginArtifact: { plugin: artifact.plugin, data: artifact.data },
+          metadata: { uuid: "artifact-1", name: "Sales bars", description: "Sales" },
+          artifact: { uuid: "artifact-1", name: "Sales bars", chatUuid: "chat-1" },
+        });
+      });
+
+      expect(mockAddWidget).toHaveBeenCalledWith(
+        "dashboard-123",
+        expect.objectContaining({
+          storage: expect.objectContaining({
+            fromArtifact: {
+              artifactUuid: "artifact-1",
+              name: "Sales bars",
+              chatUuid: "chat-1",
+            },
+          }),
+        }),
+      );
+      expect(useCopilotStore.getState().chats[0].artifacts?.[0].widgets).toEqual([
+        {
+          widgetUuid: "widget-new",
+          dashboardId: "dashboard-123",
+          name: "Sales bars",
+          createdAt: expect.any(String),
+        },
+      ]);
     });
 
     it("shows error toast when creation fails", async () => {
@@ -262,7 +343,7 @@ describe("useCreateWidgetFromArtifact", () => {
           type: "custom",
           name: "AI Title",
           description: "AI Description",
-          storage: { text: "# Title\n\nSome text" },
+          storage: { text: "# Title\n\nSome text", createdAt: expect.any(String) },
         }),
       );
       expect(widget.connectionType).toBeUndefined();

@@ -5,8 +5,14 @@ from pathlib import Path
 import pytest
 
 from api.widget_plugins import csp, proxy as proxy_rules
-from api.widget_plugins.discovery import inspect_version, resolve_served_file, scan
-from api.widget_plugins.manifest import Manifest
+from api.widget_plugins.discovery import action_icon_problem, inspect_version, resolve_served_file, scan
+from api.widget_plugins.manifest import (
+    ACTION_ICON_TAGS,
+    ACTION_ICON_VALUES,
+    ACTION_ICONS,
+    MAX_ACTION_ICON_BYTES,
+    Manifest,
+)
 from api.widget_plugins.schema_lint import lint_fragment, lint_settings_schema
 from tests.fixtures.widget_plugins import digest_of, manifest, write_package
 
@@ -153,6 +159,8 @@ class TestManifest:
             {"permissions": ["core:export:provide"], "exports": ["csv"]},
             {"model": {"traits": {"rows": {"bind": "data", "access": "readwrite"}}}},
             {"model": {"traits": {"rows": {"bind": "window"}}}},
+            {"model": {"traits": {"tiles": {"bind": "adminSettings:tiles", "access": "readwrite"}}}},
+            {"permissions": ["core:config:edit"]},
             {"handles": [{"type": "t1", "definition": {"type": "object"}}]},
         ],
         ids=str,
@@ -162,6 +170,241 @@ class TestManifest:
         data["contributes"]["widgets"][0].update(widget_change)
         with pytest.raises(ValueError):
             Manifest.model_validate(data)
+
+    @pytest.mark.parametrize(
+        "traits",
+        [
+            {"zoom": {"bind": "config:zoom", "access": "readwrite"}},
+            {"settings": {"bind": "config", "access": "readwrite"}},
+        ],
+        ids=str,
+    )
+    def test_a_module_may_write_its_config(self, traits):
+        data = manifest()
+        data["contributes"]["widgets"][0].update(
+            {"model": {"traits": traits}, "permissions": ["core:data:read", "core:config:write"]}
+        )
+        Manifest.model_validate(data)
+
+
+HEATMAP_SETTINGS = {
+    "schema": {"properties": {"heatmap": {"type": "boolean"}, "title": {"type": "string", "maxLength": 40}}},
+    "defaults": {"heatmap": False},
+}
+
+
+ARTIFACT_DATA = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["rowData"],
+    "properties": {
+        "rowData": {
+            "type": "array",
+            "maxItems": 1000,
+            "items": {
+                "type": "object",
+                "additionalProperties": {"type": ["string", "number", "boolean", "null"], "maxLength": 500},
+            },
+        }
+    },
+}
+
+
+def _with_actions(actions, permissions=("core:data:read", "core:ui:button", "core:ui:menu"), settings=None):
+    data = manifest()
+    data["contributes"]["widgets"][0].update(
+        {"actions": actions, "permissions": list(permissions), "settings": settings or HEATMAP_SETTINGS}
+    )
+    return data
+
+
+def _action(action_id="zoom", placement="navbar", **extra):
+    return {"id": action_id, "label": "Zoom in", "icon": "zoom-in", "placement": placement, **extra}
+
+
+class TestCardActions:
+    def test_a_widget_declares_buttons_and_menu_items(self):
+        parsed = Manifest.model_validate(
+            _with_actions(
+                [
+                    _action(),
+                    _action("heatmap", toggles="heatmap"),
+                    _action("reset", "menu"),
+                ]
+            )
+        )
+        actions = parsed.contributes.widgets[0].actions
+        assert [(a.id, a.placement, a.toggles) for a in actions] == [
+            ("zoom", "navbar", None),
+            ("heatmap", "navbar", "heatmap"),
+            ("reset", "menu", None),
+        ]
+
+    def test_a_widget_without_actions_needs_neither_permission(self):
+        Manifest.model_validate(_with_actions([], permissions=["core:data:read"]))
+
+    @pytest.mark.parametrize(
+        ("actions", "permissions"),
+        [
+            ([_action()], ["core:data:read"]),
+            ([_action("reset", "menu")], ["core:data:read"]),
+            ([], ["core:data:read", "core:ui:button"]),
+            ([], ["core:data:read", "core:ui:menu"]),
+            ([_action("reset", "menu")], ["core:data:read", "core:ui:menu", "core:ui:button"]),
+            ([_action(icon="skull")], ["core:data:read", "core:ui:button"]),
+            ([_action(icon="bell-icon")], ["core:data:read", "core:ui:button"]),
+            ([_action(), _action()], ["core:data:read", "core:ui:button"]),
+            ([_action(label="")], ["core:data:read", "core:ui:button"]),
+            ([_action(label="x" * 41)], ["core:data:read", "core:ui:button"]),
+            ([_action(action_id="Zoom")], ["core:data:read", "core:ui:button"]),
+            ([_action(placement="toolbar")], ["core:data:read", "core:ui:button"]),
+            ([_action(html="<b>x</b>")], ["core:data:read", "core:ui:button"]),
+            ([_action(f"a{i}") for i in range(4)], ["core:data:read", "core:ui:button"]),
+            ([_action(f"a{i}", "menu") for i in range(9)], ["core:data:read", "core:ui:menu"]),
+            ([_action("reset", "menu", toggles="heatmap")], ["core:data:read", "core:ui:menu"]),
+            ([_action(toggles="title")], ["core:data:read", "core:ui:button"]),
+            ([_action(toggles="missing")], ["core:data:read", "core:ui:button"]),
+        ],
+        ids=str,
+    )
+    def test_invalid_actions(self, actions, permissions):
+        with pytest.raises(ValueError):
+            Manifest.model_validate(_with_actions(actions, permissions=permissions))
+
+    def test_a_toggle_needs_a_declared_setting(self):
+        data = _with_actions([_action(toggles="heatmap")], permissions=["core:data:read", "core:ui:button"])
+        del data["contributes"]["widgets"][0]["settings"]
+        with pytest.raises(ValueError):
+            Manifest.model_validate(data)
+
+    def test_a_widget_adds_a_widget_of_its_plugin_after_an_action(self):
+        data = _with_actions(
+            [_action("freeze", "menu")],
+            permissions=["core:data:read", "core:ui:menu", "core:dashboard:add-widget"],
+        )
+        table = {**data["contributes"]["widgets"][0], "id": "table", "actions": [], "settings": None}
+        table.update(
+            {
+                "permissions": ["core:data:read"],
+                "handles": [{"type": "test_table"}],
+                "artifact": {"description": "Rows in a table", "data": ARTIFACT_DATA},
+            }
+        )
+        data["contributes"]["widgets"].append(table)
+        Manifest.model_validate(data)
+
+    def test_adding_a_widget_needs_an_action(self):
+        data = _with_actions([], permissions=["core:data:read", "core:dashboard:add-widget"])
+        data["contributes"]["widgets"][0]["artifact"] = {"description": "Rows", "data": ARTIFACT_DATA}
+        with pytest.raises(ValueError, match="an action that toggles nothing"):
+            Manifest.model_validate(data)
+
+    def test_a_toggle_does_not_count_as_an_action_that_adds_a_widget(self):
+        data = _with_actions(
+            [_action("heat", toggles="heatmap")],
+            permissions=["core:data:read", "core:ui:button", "core:dashboard:add-widget"],
+        )
+        data["contributes"]["widgets"][0]["artifact"] = {"description": "Rows", "data": ARTIFACT_DATA}
+        with pytest.raises(ValueError, match="an action that toggles nothing"):
+            Manifest.model_validate(data)
+
+    def test_adding_a_widget_needs_a_widget_that_takes_data(self):
+        data = _with_actions(
+            [_action("freeze", "menu")],
+            permissions=["core:data:read", "core:ui:menu", "core:dashboard:add-widget"],
+        )
+        with pytest.raises(ValueError, match="has a widget with an artifact"):
+            Manifest.model_validate(data)
+
+    def test_an_action_may_use_an_svg_of_the_package(self):
+        parsed = Manifest.model_validate(
+            _with_actions([_action(icon="assets/zoom.svg")], permissions=["core:data:read", "core:ui:button"])
+        )
+        assert "assets/zoom.svg" in parsed.served_paths()
+
+    @pytest.mark.parametrize("icon", ["zoom.svg", "assets/zoom.png", "assets/../plugin.json", "assets/a/b.svg"])
+    def test_an_icon_path_is_an_svg_directly_under_assets(self, icon):
+        with pytest.raises(ValueError, match="neither a host icon nor an SVG file"):
+            Manifest.model_validate(_with_actions([_action(icon=icon)], permissions=["core:data:read", "core:ui:button"]))
+
+    @pytest.mark.parametrize(
+        "svg",
+        [
+            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16">'
+            '<path d="M0 0h16v16z" fill="currentColor"/></svg>',
+            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="none" stroke="currentColor" '
+            'stroke-width="1.5" stroke-linecap="round"><g transform="translate(1, 2) rotate(45)">'
+            '<circle cx="8" cy="8" r="2" fill="#0af"/></g></svg>',
+        ],
+    )
+    def test_a_clean_icon_passes(self, svg):
+        assert action_icon_problem(svg) is None
+
+    @pytest.mark.parametrize(
+        ("svg", "problem"),
+        [
+            ('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>', "<script>"),
+            ('<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)"/>', "onload"),
+            ('<svg xmlns="http://www.w3.org/2000/svg"><foreignObject/></svg>', "<foreignObject>"),
+            (
+                '<svg xmlns="http://www.w3.org/2000/svg" xmlns:x="http://www.w3.org/1999/xlink">'
+                '<use x:href="https://evil.example/a.svg#i"/></svg>',
+                "<use>",
+            ),
+            ('<svg xmlns="http://www.w3.org/2000/svg"><a href="javascript:alert(1)"/></svg>', "<a>"),
+            (
+                '<svg xmlns="http://www.w3.org/2000/svg"><rect fill="url(https://evil.example/p)"/></svg>',
+                "a value of fill",
+            ),
+            ('<svg xmlns="http://www.w3.org/2000/svg"><rect fill="\\75 rl(https://e.example/p)"/></svg>', "fill"),
+            ('<svg xmlns="http://www.w3.org/2000/svg"><rect stroke="u\\72l(https://e.example/c)"/></svg>', "stroke"),
+            (
+                '<svg xmlns="http://www.w3.org/2000/svg"><rect fill="image-set(\'https://e.example/m\' 1x)"/></svg>',
+                "fill",
+            ),
+            ('<svg xmlns="http://www.w3.org/2000/svg"><rect fill="url(#g)"/></svg>', "a value of fill"),
+            ('<svg xmlns="http://www.w3.org/2000/svg"><rect id="root"/></svg>', "attribute id"),
+            ('<svg xmlns="http://www.w3.org/2000/svg"><rect mask="url(#m)"/></svg>', "attribute mask"),
+            ('<svg xmlns="http://www.w3.org/2000/svg"><defs/></svg>', "<defs>"),
+            ('<svg xmlns="http://www.w3.org/2000/svg"><g transform="url(https://e.example/x)"/></svg>', "transform"),
+            ('<svg xmlns="http://www.w3.org/2000/svg"><path d="M0 0 url(https://e.example/x)"/></svg>', "a value of d"),
+            ('<svg xmlns="http://www.w3.org/2000/svg"><rect style="fill:red"/></svg>', "style"),
+            ('<!DOCTYPE svg [<!ENTITY a "aaaa">]><svg>&a;</svg>', "DOCTYPE or an entity"),
+            ("<html/>", "not an <svg>"),
+            ("<svg", "not well-formed"),
+        ],
+        ids=lambda v: v[:40] if isinstance(v, str) else v,
+    )
+    def test_an_unsafe_icon_is_refused(self, svg, problem):
+        assert problem in (action_icon_problem(svg) or "")
+
+    def test_a_package_with_an_unsafe_icon_is_blocked(self, tmp_path):
+        data = _with_actions([_action(icon="assets/zoom.svg")], permissions=["core:data:read", "core:ui:button"])
+        data["version"] = "1.0.0"
+        files = {
+            "entry.js": b"export default {}\n",
+            "entry.css": b"body{}\n",
+            "assets/zoom.svg": b'<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)"/>',
+        }
+        write_package(tmp_path, data, files=files)
+        [found] = _scan(tmp_path).versions
+        assert any("assets/zoom.svg: the action icon" in e for e in found.errors)
+
+    def test_a_package_without_its_icon_is_blocked(self, tmp_path):
+        data = _with_actions([_action(icon="assets/zoom.svg")], permissions=["core:data:read", "core:ui:button"])
+        write_package(tmp_path, data)
+        [found] = _scan(tmp_path).versions
+        assert "assets/zoom.svg: named by the manifest but missing" in found.errors
+
+    def test_the_host_and_the_web_app_allow_the_same_svg(self):
+        spec = json.loads((Path(__file__).resolve().parents[3] / "frontend/src/plugins/action-icon-svg.json").read_text())
+        assert set(spec["tags"]) == ACTION_ICON_TAGS
+        assert spec["values"] == ACTION_ICON_VALUES
+        assert spec["maxBytes"] == MAX_ACTION_ICON_BYTES
+
+    def test_the_host_and_the_web_app_offer_the_same_icons(self):
+        icons = json.loads((Path(__file__).resolve().parents[3] / "frontend/src/plugins/action-icons.json").read_text())
+        assert set(icons) == ACTION_ICONS
 
 
 class TestDiscovery:
@@ -174,6 +417,13 @@ class TestDiscovery:
         assert found.block_reason is None
         assert found.digest == digest_of(directory)
         assert set(found.served_files()) == {"entry.js", "entry.css"}
+
+    def test_a_version_whose_directory_is_gone_is_reported_and_not_raised(self, tmp_path):
+        (tmp_path / "test-chart").mkdir()
+        found = inspect_version(
+            tmp_path, "test-chart", "1.0.0", pins={}, require_pins=False, max_files=10, max_bytes=1000, development=True
+        )
+        assert found.errors == ["test-chart/1.0.0 is missing"]
 
     def test_the_directory_must_be_set_and_exist(self, tmp_path):
         assert scan(None).error

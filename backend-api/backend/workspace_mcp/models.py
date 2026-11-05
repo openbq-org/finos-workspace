@@ -93,9 +93,24 @@ class WorkspaceAgent(BaseModel):
     features: dict[str, bool | AgentFeatureOption] = Field(default_factory=dict)
 
 
+class CopiedFrom(BaseModel):
+    widget_uuid: str
+    name: str
+    created_at: str | None = None
+
+
+class FromArtifact(BaseModel):
+    artifact_uuid: str
+    name: str
+    created_at: str | None = None
+    in_current_chat: bool | None = None
+
+
 class WidgetInfo(BaseModel):
     widget_uuid: str
     name: str
+    copied_from: CopiedFrom | None = None
+    from_artifact: FromArtifact | None = None
 
 
 class TabInfo(BaseModel):

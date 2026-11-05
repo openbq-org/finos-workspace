@@ -61,6 +61,106 @@ export async function callPluginBackend(
   return data;
 }
 
+export interface PluginPreset {
+  id: string;
+  name: string;
+  scope: "user" | "org";
+  is_default: boolean;
+  config: Record<string, unknown> | null;
+  state: unknown;
+  updated_at: string;
+}
+
+export interface PluginPresetChanges {
+  name?: string;
+  config?: Record<string, unknown> | null;
+  state?: unknown;
+  is_default?: boolean;
+}
+
+const presetsPath = (pluginId: string, widgetId: string) =>
+  `/app/widget-plugins/${encodeURIComponent(pluginId)}/widgets/${encodeURIComponent(widgetId)}/presets`;
+
+const orgPresetsPath = (pluginId: string, widgetId: string) =>
+  `/admin/plugins/${encodeURIComponent(pluginId)}/widgets/${encodeURIComponent(widgetId)}/presets`;
+
+export async function listPluginPresets(pluginId: string, widgetId: string) {
+  const { data } = await apiClient.get<{ presets: PluginPreset[]; limit: number }>(
+    presetsPath(pluginId, widgetId),
+  );
+  return data;
+}
+
+export async function createPluginPreset(
+  pluginId: string,
+  widgetId: string,
+  body: PluginPresetChanges & { name: string },
+) {
+  const { data } = await apiClient.post<PluginPreset>(
+    presetsPath(pluginId, widgetId),
+    body,
+  );
+  return data;
+}
+
+export async function updatePluginPreset(
+  pluginId: string,
+  widgetId: string,
+  presetId: string,
+  body: PluginPresetChanges,
+) {
+  const { data } = await apiClient.patch<PluginPreset>(
+    `${presetsPath(pluginId, widgetId)}/${encodeURIComponent(presetId)}`,
+    body,
+  );
+  return data;
+}
+
+export async function deletePluginPreset(
+  pluginId: string,
+  widgetId: string,
+  presetId: string,
+) {
+  await apiClient.delete(
+    `${presetsPath(pluginId, widgetId)}/${encodeURIComponent(presetId)}`,
+  );
+}
+
+export async function publishOrgPreset(
+  pluginId: string,
+  widgetId: string,
+  body: PluginPresetChanges & { name: string },
+) {
+  const { data } = await apiClient.post<PluginPreset>(
+    orgPresetsPath(pluginId, widgetId),
+    body,
+  );
+  return data;
+}
+
+export async function updateOrgPreset(
+  pluginId: string,
+  widgetId: string,
+  presetId: string,
+  body: PluginPresetChanges,
+) {
+  const { data } = await apiClient.patch<PluginPreset>(
+    `${orgPresetsPath(pluginId, widgetId)}/${encodeURIComponent(presetId)}`,
+    body,
+  );
+  return data;
+}
+
+export async function deleteOrgPreset(
+  pluginId: string,
+  widgetId: string,
+  presetId: string,
+) {
+  await apiClient.delete(
+    `${orgPresetsPath(pluginId, widgetId)}/${encodeURIComponent(presetId)}`,
+  );
+}
+
 export async function postPluginReports(body: {
   plugin_id: string;
   version: string;
@@ -383,6 +483,7 @@ export interface EntityPlugin {
   };
   handlers: Record<string, string>;
   role_grants: number;
+  preset_limit: number;
 }
 
 export interface EntityPluginChanges {
@@ -393,6 +494,7 @@ export interface EntityPluginChanges {
   data_sources?: Record<string, string | null>;
   settings?: Record<string, unknown>;
   handlers?: Record<string, string | null>;
+  preset_limit?: number | null;
 }
 
 export async function getEntityPlugins() {

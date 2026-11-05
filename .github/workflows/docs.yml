@@ -2,14 +2,7 @@ name: Docs
 
 on:
   pull_request:
-    paths:
-      - "docs/**"
-      - "website/**"
-      - "netlify.toml"
-      - "backend-api/backend/**"
-      - "frontend/**"
-      - "agent/**"
-      - ".github/workflows/docs.yml"
+  merge_group:
   push:
     branches:
       - main
@@ -150,7 +143,7 @@ jobs:
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
-          NETLIFY_SITE_ID: ${{ vars.NETLIFY_SITE_ID }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
         run: |
           site=$(curl --fail --silent --show-error --header "Authorization: Bearer $NETLIFY_AUTH_TOKEN" "https://api.netlify.com/api/v1/sites/$NETLIFY_SITE_ID")
           address=$(jq --raw-output 'if .custom_domain then "https://" + .custom_domain else .ssl_url end' <<< "$site")
@@ -194,7 +187,6 @@ jobs:
           docker run --rm -v "$PWD:/repo" -w /repo/website "$NODE_IMAGE" /usr/local/bin/node \
             --disable-warning=ExperimentalWarning scripts/check-toc.mts
       - name: Keep the built site for the deploy
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: actions/upload-artifact@v4
         with:
           name: site
@@ -203,7 +195,7 @@ jobs:
 
   deploy:
     name: Deploy to Netlify
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' || github.base_ref == 'main' || github.event.merge_group.base_ref == 'refs/heads/main'
     needs: build
     runs-on: ubuntu-latest
     steps:
@@ -217,5 +209,6 @@ jobs:
       - name: Publish the site that the build checked
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
-          NETLIFY_SITE_ID: ${{ vars.NETLIFY_SITE_ID }}
-        run: npx --yes netlify-cli@27.15.0 deploy --prod --no-build --dir site --message "$GITHUB_SHA"
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+          PRODUCTION: ${{ github.event_name == 'push' && '--prod' || '' }}
+        run: npx --yes netlify-cli@27.15.0 deploy $PRODUCTION --no-build --dir site --message "$GITHUB_SHA"

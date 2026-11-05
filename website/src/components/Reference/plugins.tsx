@@ -47,7 +47,15 @@ export function PluginList({
   of,
   or,
 }: {
-  of: "permissionsLater" | "commandErrors" | "exportMembers" | "traits" | "builtInTypes";
+  of:
+    | "permissionsLater"
+    | "commandErrors"
+    | "exportMembers"
+    | "traits"
+    | "builtInTypes"
+    | "actionIcons"
+    | "actionIconTags"
+    | "actionIconAttributes";
   or?: boolean;
 }) {
   return <Codes items={pluginsData[of]} or={or} />;

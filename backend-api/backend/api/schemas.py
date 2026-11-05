@@ -248,8 +248,7 @@ class UserDisplaySettings(BaseModel, extra="allow"):  # type: ignore[call-arg]
     theme: Literal["light", "dark"] | None = Field(
         None,
         description=(
-            "The color mode that the user chose, `light` or `dark`. When it is empty, the web app follows the "
-            "system."
+            "The color mode that the user chose, `light` or `dark`. When it is empty, the web app follows the system."
         ),
     )
     showWidgetControls: bool = Field(False, description="Whether widget cards always show their controls.")
@@ -491,36 +490,23 @@ def strip_endpoint_credentials(content: Any) -> Any:
         return [strip_endpoint_credentials(item) for item in content]
     if not isinstance(content, dict):
         return content
-    stripped = {
-        key: strip_endpoint_credentials(value)
-        for key, value in content.items()
-        if key != "endpointHeaders"
-    }
+    stripped = {key: strip_endpoint_credentials(value) for key, value in content.items() if key != "endpointHeaders"}
     if isinstance(endpoint := stripped.get("endpoint"), dict):
-        stripped["endpoint"] = {
-            key: value
-            for key, value in endpoint.items()
-            if key not in ENDPOINT_CREDENTIAL_KEYS
-        }
+        stripped["endpoint"] = {key: value for key, value in endpoint.items() if key not in ENDPOINT_CREDENTIAL_KEYS}
     return stripped
 
 
 class DashboardsCreate(BaseModel):
     items: dict[UUID, Literal["DELETE"] | dict] = Field(
         description=(
-            "The dashboards to save, by UUID. Each value is the dashboard's content, or `DELETE` to delete the "
-            "dashboard."
+            "The dashboards to save, by UUID. Each value is the dashboard's content, or `DELETE` to delete the dashboard."
         ),
     )
 
     @field_validator("items")
     @classmethod
-    def strip_credentials(
-        cls, items: dict[UUID, Literal["DELETE"] | dict]
-    ) -> dict[UUID, Literal["DELETE"] | dict]:
-        return {
-            uuid: strip_endpoint_credentials(content) for uuid, content in items.items()
-        }
+    def strip_credentials(cls, items: dict[UUID, Literal["DELETE"] | dict]) -> dict[UUID, Literal["DELETE"] | dict]:
+        return {uuid: strip_endpoint_credentials(content) for uuid, content in items.items()}
 
 
 class DashboardOwned(BaseModel):
@@ -600,16 +586,10 @@ class UsageLimitError(BaseModel):
     @classmethod
     def limit_error(cls, usage: UsageGet, tokens: bool = False) -> JSONResponse:
         if tokens:
-            message = (
-                "The daily token limit of "
-                f"{usage.copilot_tokens_limit} has been reached"
-            )
+            message = f"The daily token limit of {usage.copilot_tokens_limit} has been reached"
             current_usage = usage.number_copilot_tokens_day_count
         else:
-            message = (
-                "Cannot increment usage beyond the maximum limit of "
-                f"{usage.copilot_calls_limit}"
-            )
+            message = f"Cannot increment usage beyond the maximum limit of {usage.copilot_calls_limit}"
             current_usage = usage.number_copilot_calls_day_count
         return JSONResponse(
             status_code=422,
@@ -658,7 +638,7 @@ class DashboardCompleteWithContext(DashboardComplete):
     )
     copilot_access: "CopilotAccess | None" = Field(
         None,
-        description="The Copilot models, MCP tools and capabilities that the user's roles grant.",
+        description="The Copilot models, MCP tools and capabilities that the user may use.",
     )
 
 
@@ -972,9 +952,7 @@ class MCPTool(BaseModel):
     enabled: bool = Field(True, description="Whether the user switched the tool on.")
 
 
-MCPHeaderName = Annotated[
-    str, StringConstraints(pattern=r"^[!#$%&'*+.^_`|~0-9A-Za-z-]+$", max_length=100)
-]
+MCPHeaderName = Annotated[str, StringConstraints(pattern=r"^[!#$%&'*+.^_`|~0-9A-Za-z-]+$", max_length=100)]
 MCPHeaderValue = Annotated[str, StringConstraints(pattern=r"^[^\r\n\x00]*$", max_length=8192)]
 
 
@@ -990,8 +968,7 @@ class MCPServer(BaseModel):
         default=None,
         exclude=True,
         description=(
-            "The headers that the web app sends to the server, by name. The API stores the values and never returns "
-            "them."
+            "The headers that the web app sends to the server, by name. The API stores the values and never returns them."
         ),
     )
     custom_header_names: list[str] = Field(
@@ -1020,10 +997,33 @@ def mcp_header_flags(headers: dict[str, str] | None) -> dict[str, list[str] | bo
     }
 
 
+DEFAULT_PORTS = {"http": 80, "https": 443}
+
+
 def normalize_mcp_url(url: str) -> str:
     parsed = urlsplit(url.strip())
+    scheme = parsed.scheme.lower()
     path = parsed.path.rstrip("/")
-    return urlunsplit((parsed.scheme.lower(), parsed.netloc.lower(), path, "", ""))
+    try:
+        port = parsed.port
+    except ValueError:
+        return urlunsplit((scheme, parsed.netloc.lower(), path, "", ""))
+    host = (parsed.hostname or "").rstrip(".")
+    if ":" in host:
+        host = f"[{host}]"
+    if port is not None and port != DEFAULT_PORTS.get(scheme):
+        host = f"{host}:{port}"
+    userinfo, at, _ = parsed.netloc.rpartition("@")
+    return urlunsplit((scheme, f"{userinfo.lower()}{at}{host}", path, "", ""))
+
+
+def mcp_host_and_port(url: str) -> tuple[str, int | None]:
+    parsed = urlsplit(normalize_mcp_url(url))
+    try:
+        port = parsed.port
+    except ValueError:
+        port = None
+    return (parsed.hostname or "").rstrip("."), port or DEFAULT_PORTS.get(parsed.scheme)
 
 
 def mcp_server_url(url: str) -> str:
@@ -1149,9 +1149,7 @@ class CopilotAuthorize(BaseModel):
     tools: list[CopilotToolRef] = Field(default_factory=list, description="The MCP tools that the agent wants to use.")
 
 
-ProviderKey = Annotated[
-    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=1024, pattern=r"^\S+$")
-]
+ProviderKey = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=1024, pattern=r"^\S+$")]
 
 
 class CopilotProviderKeys(BaseModel):
@@ -1589,9 +1587,7 @@ class PatchRole(BaseModel):
     def changes(self) -> dict[str, Any]:
         return {
             key: value
-            for key, value in self.model_dump(
-                exclude={"users"}, exclude_unset=True
-            ).items()
+            for key, value in self.model_dump(exclude={"users"}, exclude_unset=True).items()
             if value is not None or key in ROLE_LIMITS
         }
 

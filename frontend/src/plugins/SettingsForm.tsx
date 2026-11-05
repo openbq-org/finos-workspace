@@ -1,5 +1,6 @@
 import { useId } from "react";
-import type { SettingsSchema } from "./types";
+import { LIMITS } from "~/lib/types/widgetsContract";
+import { MAX_SETTING_LENGTH, type SettingsSchema } from "./types";
 
 export function SettingsForm(props: {
   schema: SettingsSchema;
@@ -97,6 +98,52 @@ export function SettingsForm(props: {
   );
 }
 
+export type CardDetails = { name: string; description: string };
+
+export function CardDetailsForm({
+  values,
+  onChange,
+  disabled,
+}: {
+  values: CardDetails;
+  onChange: (values: CardDetails) => void;
+  disabled?: boolean;
+}) {
+  const formId = useId();
+  return (
+    <div className="flex flex-col gap-3 pb-3">
+      <div className="flex flex-col gap-1">
+        <label htmlFor={`${formId}-name`} className="body-xs-medium">
+          Name
+        </label>
+        <input
+          id={`${formId}-name`}
+          type="text"
+          className="rounded border border-general-border-secondary bg-transparent p-1"
+          value={values.name}
+          maxLength={LIMITS.name}
+          disabled={disabled}
+          onChange={(e) => onChange({ ...values, name: e.target.value })}
+        />
+      </div>
+      <div className="flex flex-col gap-1">
+        <label htmlFor={`${formId}-description`} className="body-xs-medium">
+          Description
+        </label>
+        <textarea
+          id={`${formId}-description`}
+          className="rounded border border-general-border-secondary bg-transparent p-1"
+          rows={2}
+          value={values.description}
+          maxLength={LIMITS.description}
+          disabled={disabled}
+          onChange={(e) => onChange({ ...values, description: e.target.value })}
+        />
+      </div>
+    </div>
+  );
+}
+
 export function cleanSettings(
   schema: SettingsSchema | undefined,
   values: Record<string, unknown> | undefined,
@@ -117,7 +164,7 @@ export function cleanSettings(
     )
       result[key] = prop.type === "integer" ? Math.trunc(value) : value;
     else if (prop.type === "string" && typeof value === "string")
-      result[key] = value.slice(0, prop.maxLength ?? 1000);
+      result[key] = value.slice(0, prop.maxLength ?? MAX_SETTING_LENGTH);
   }
   return result;
 }

@@ -40,12 +40,21 @@ export default {
     gridEl.style.width = "100%";
     el.appendChild(gridEl);
 
+    const floatingFilters = () => model.get("config")?.floatingFilters === true;
+    const withFloatingFilters = (gridOptions) => ({
+      ...gridOptions,
+      defaultColDef: { ...(gridOptions.defaultColDef || {}), floatingFilter: floatingFilters() },
+    });
+
     const mount = ({ rowData, columnDefs, gridOptions }) => {
       currentColumnDefs = columnDefs;
       currentRowData = rowData;
       currentGridOptions = gridOptions;
       keyed = hasIds(rowData);
-      api = createGrid(gridEl, gridOptionsFor({ mode: modeOf(), rowData, columnDefs, gridOptions, keyed }));
+      api = createGrid(
+        gridEl,
+        gridOptionsFor({ mode: modeOf(), rowData, columnDefs, gridOptions: withFloatingFilters(gridOptions), keyed }),
+      );
       detach = tracker.attach(api);
     };
 
@@ -85,8 +94,23 @@ export default {
       api.sizeColumnsToFit();
     };
 
+    const onConfigChange = () => {
+      api.setGridOption("defaultColDef", { ...api.getGridOption("defaultColDef"), floatingFilter: floatingFilters() });
+    };
+
+    const onEvent = (message) => {
+      if (message?.kind !== "workspace-event" || message.name !== "action") return;
+      if (message.id === "autosize") api.autoSizeAllColumns();
+      if (message.id === "clear-filters") {
+        api.setFilterModel(null);
+        api.applyColumnState({ defaultState: { sort: null } });
+      }
+    };
+
     model.on("change:data", onDataChange);
     model.on("change:theme", onThemeChange);
+    model.on("change:config", onConfigChange);
+    model.on("msg:custom", onEvent);
 
     const resizeObserver = new ResizeObserver(() => { if (api) api.sizeColumnsToFit(); });
     resizeObserver.observe(el);
@@ -94,6 +118,8 @@ export default {
     signal.addEventListener("abort", () => {
       model.off("change:data", onDataChange);
       model.off("change:theme", onThemeChange);
+      model.off("change:config", onConfigChange);
+      model.off("msg:custom", onEvent);
       detach();
       resizeObserver.disconnect();
       api.destroy();

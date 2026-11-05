@@ -22,6 +22,8 @@ export const pluginKeys = {
   reports: (pluginId: string, scope: string) =>
     ["widget-plugins", "reports", pluginId, scope] as const,
   role: (roleUuid: string) => ["widget-plugins", "role", roleUuid] as const,
+  presets: (pluginId: string, widgetId: string) =>
+    ["widget-plugins", "presets", pluginId, widgetId] as const,
 };
 
 const REFRESH = {

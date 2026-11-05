@@ -4,6 +4,7 @@ import { useMcpToolsStore } from "~/lib/state/mcpTools";
 
 vi.mock("~/api/auth.api", () => ({
   postMCPServers: vi.fn().mockResolvedValue({}),
+  fetchCopilotAccess: vi.fn().mockResolvedValue(null),
 }));
 
 beforeEach(() => {

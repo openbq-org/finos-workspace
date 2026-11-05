@@ -21,6 +21,7 @@ services:
     environment:
       BACKEND_URL: ${API_URL:-https://localhost:8000}
       AI_API_URL: ${AI_API_URL:-https://localhost:7777}
+      CSP_EXTRA_SOURCES: connect-src http://localhost:${E2E_REACH_PORT:-7793}
 
   api:
     ports: !reset []

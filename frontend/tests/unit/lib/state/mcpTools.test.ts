@@ -1,6 +1,6 @@
 import { act } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { postMCPServers } from "~/api/auth.api";
+import { fetchCopilotAccess, postMCPServers } from "~/api/auth.api";
 import { useCopilotAccessStore } from "~/lib/state/copilotAccess";
 import {
   type AgentToolConfig,
@@ -17,6 +17,7 @@ const defaultOf = (tool: AgentToolConfig, argument: string) =>
 
 vi.mock("~/api/auth.api", () => ({
   postMCPServers: vi.fn().mockResolvedValue({}),
+  fetchCopilotAccess: vi.fn().mockResolvedValue(null),
 }));
 
 vi.mock("sonner", () => ({
@@ -298,6 +299,38 @@ describe("useMcpToolsStore", () => {
       await useMcpToolsStore.getState().saveMCPServers();
 
       expect(postMCPServers).toHaveBeenCalledWith([regularServer]);
+    });
+
+    it("reads the user's access again once the servers are saved", async () => {
+      const server = createMockServer({
+        id: "server-1",
+        url: "https://own.example.com/mcp",
+      });
+      vi.mocked(fetchCopilotAccess).mockResolvedValueOnce({
+        models: [],
+        mcp: [{ server_url: "https://own.example.com/mcp", tool_name: "*" }],
+      });
+      act(() => {
+        useMcpToolsStore.setState({ servers: [server] });
+      });
+
+      await useMcpToolsStore.getState().saveMCPServers();
+
+      expect(fetchCopilotAccess).toHaveBeenCalledTimes(1);
+      expect(useCopilotAccessStore.getState().access?.mcp).toEqual([
+        { server_url: "https://own.example.com/mcp", tool_name: "*" },
+      ]);
+    });
+
+    it("keeps the access it has when the save fails", async () => {
+      vi.mocked(postMCPServers).mockResolvedValueOnce({ status: 500 });
+      act(() => {
+        useMcpToolsStore.setState({ servers: [createMockServer({ id: "server-1" })] });
+      });
+
+      await useMcpToolsStore.getState().saveMCPServers();
+
+      expect(fetchCopilotAccess).not.toHaveBeenCalled();
     });
 
     it("should not save when removing an iframe widget server", () => {

@@ -1,7 +1,8 @@
 from datetime import datetime
+from typing import Any
 from uuid import UUID
 
-from sqlalchemy import Boolean, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, ForeignKey, Index, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy_utils import UUIDType
 
@@ -25,6 +26,10 @@ VERSION_BLOCKED = "blocked"
 VERSION_RETIRED = "retired"
 VERSION_MISSING = "missing"
 VERSION_DEVELOPMENT = "development"
+
+PRESET_USER = "user"
+PRESET_ORG = "org"
+DEFAULT_PRESET_LIMIT = 100
 
 
 class WidgetPlugin(Base, UUIDMixin, DateMixin):
@@ -72,6 +77,7 @@ class EntityWidgetPlugin(Base, UUIDMixin, DateMixin):
     csp_narrow: Mapped[dict | None] = mapped_column(JSONType, default=None)
     server_network_narrow: Mapped[list | None] = mapped_column(JSONType, default=None)
     data_sources: Mapped[dict | None] = mapped_column(JSONType, default=None)
+    preset_limit: Mapped[int | None] = mapped_column(Integer, default=None)
 
 
 class EntityVizHandler(Base, UUIDMixin, DateMixin):
@@ -136,3 +142,18 @@ class WidgetPluginSecret(Base, UUIDMixin, DateMixin):
     name: Mapped[str] = mapped_column(String(64))
     value: Mapped[dict] = mapped_column(EncryptedType("widget_plugin_secret.value"))
     set_by_uuid: Mapped[UUID | None] = mapped_column(UUIDType, default=None)
+
+
+class WidgetPluginPreset(Base, UUIDMixin, DateMixin):
+    __tablename__ = "widget_plugin_preset"
+    __table_args__ = (Index("ix_widget_plugin_preset_widget", "entity_uuid", "plugin_uuid", "widget_id"),)
+
+    plugin_uuid: Mapped[UUID] = mapped_column(ForeignKey("widget_plugin.uuid", ondelete="CASCADE"), index=True)
+    widget_id: Mapped[str] = mapped_column(String(48))
+    entity_uuid: Mapped[UUID] = mapped_column(ForeignKey("entity.uuid", ondelete="CASCADE"), index=True)
+    owner_uuid: Mapped[UUID | None] = mapped_column(ForeignKey("user.uuid", ondelete="CASCADE"), default=None, index=True)
+    scope: Mapped[str] = mapped_column(String(8), default=PRESET_USER)
+    name: Mapped[str] = mapped_column(String(80))
+    config: Mapped[dict | None] = mapped_column(JSONType, default=None)
+    state: Mapped[Any] = mapped_column(JSONType, default=None, nullable=True)
+    is_default: Mapped[bool] = mapped_column(Boolean, default=False)

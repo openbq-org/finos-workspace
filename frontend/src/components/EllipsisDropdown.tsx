@@ -250,7 +250,9 @@ export default function EllipsisDropdownMenu(props: EllipsisDropdownMenuProps) {
               item.onClick?.();
             }}
           >
-            <Icon id={item.icon} key={`${childKey}-${item.icon}`} />
+            {item.iconElement ?? (
+              <Icon id={item.icon} key={`${childKey}-${item.icon}`} />
+            )}
             {item.label}
           </DropdownMenuPrimitive.Item>
         );

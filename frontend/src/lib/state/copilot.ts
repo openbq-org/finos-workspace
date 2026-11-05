@@ -423,12 +423,20 @@ export type ExternalCopilotHolder = {
   copilots?: Copilot[];
 };
 
+export type ArtifactWidgetLink = {
+  widgetUuid: string;
+  dashboardId: string;
+  name: string;
+  createdAt: string;
+};
+
 type BaseArtifact = {
   uuid: string;
   name?: string;
   description?: string;
   metadata?: Record<string, unknown>;
   timestamp?: number;
+  widgets?: ArtifactWidgetLink[];
 };
 type TextArtifact = BaseArtifact & { type: "text"; content: string };
 type HtmlArtifact = BaseArtifact & { type: "html"; content: string };
@@ -612,6 +620,11 @@ interface CopilotState {
   addAction: (action: string) => void;
   clearActionHistory: () => void;
   addArtifactToCurrentChat: (artifact: ArtifactT) => void;
+  recordArtifactWidget: (
+    chatUuid: string,
+    artifactUuid: string,
+    link: ArtifactWidgetLink,
+  ) => void;
   getCurrentChatArtifact: (chatArtifactId: string) => ArtifactT | undefined;
   getCurrentChatArtifacts: () => ArtifactT[];
   getMessageByTimestamp: (timestamp: number) => HumanMessage | AIMessage | undefined;
@@ -846,6 +859,31 @@ export const useCopilotStore = createWithEqualityFn<CopilotState>()(
               artifact,
             ];
           }
+        },
+        recordArtifactWidget: (chatUuid, artifactUuid, link) => {
+          set({
+            chats: get().chats.map((chat) =>
+              chat.uuid !== chatUuid ||
+              !chat.artifacts?.some((artifact) => artifact.uuid === artifactUuid)
+                ? chat
+                : {
+                    ...chat,
+                    artifacts: chat.artifacts.map((artifact) =>
+                      artifact.uuid === artifactUuid
+                        ? {
+                            ...artifact,
+                            widgets: [
+                              ...(artifact.widgets ?? []).filter(
+                                (widget) => widget.widgetUuid !== link.widgetUuid,
+                              ),
+                              link,
+                            ],
+                          }
+                        : artifact,
+                    ),
+                  },
+            ),
+          });
         },
         updateChats: (chats, options = {}) => {
           if (!chats) return;

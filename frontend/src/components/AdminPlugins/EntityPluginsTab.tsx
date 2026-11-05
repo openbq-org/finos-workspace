@@ -81,11 +81,13 @@ function EntityPluginCard({
     new Set(plugin.server_network_narrow),
   );
   const [settings, setSettings] = useState<Record<string, unknown>>(plugin.settings);
+  const [presetLimit, setPresetLimit] = useState(String(plugin.preset_limit));
 
   useEffect(() => {
     setNarrowed(new Set(plugin.narrowed_permissions));
     setRemovedHosts(new Set(plugin.server_network_narrow));
     setSettings(plugin.settings);
+    setPresetLimit(String(plugin.preset_limit));
     setKept(
       Object.fromEntries(
         Object.entries(plugin.csp.approved).map(([directive, sources]) => [
@@ -127,6 +129,7 @@ function EntityPluginCard({
       ),
       server_network_narrow: [...removedHosts],
       settings,
+      preset_limit: presetLimit.trim() ? Number(presetLimit) : null,
     });
 
   return (
@@ -270,6 +273,24 @@ function EntityPluginCard({
               ))}
             </Section>
           )}
+
+          <Section
+            title="Presets"
+            hint="How many presets each user may keep of each of this plugin's widgets. Leave it empty for the default."
+          >
+            <label className="flex items-center gap-2 body-xs-regular">
+              <span className="body-xs-medium">Presets per user and widget</span>
+              <input
+                type="number"
+                min={1}
+                max={100000}
+                className="w-24 rounded border border-general-border-secondary bg-transparent p-1 body-xs-regular"
+                value={presetLimit}
+                disabled={isPending}
+                onChange={(e) => setPresetLimit(e.target.value)}
+              />
+            </label>
+          </Section>
 
           {settingsSchema.success &&
             Object.keys(settingsSchema.data.properties ?? {}).length > 0 && (

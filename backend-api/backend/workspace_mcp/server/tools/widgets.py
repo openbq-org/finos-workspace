@@ -40,9 +40,7 @@ from workspace_mcp.server._helpers import (
 
 type DashboardId = Annotated[str | None, Field(description=DASHBOARD_ID_PARAM)]
 type WidgetUuid = Annotated[str | None, Field(description=WIDGET_UUID_PARAM)]
-type WidgetIdFallback = Annotated[
-    str | None, Field(description=WIDGET_ID_FALLBACK_PARAM)
-]
+type WidgetIdFallback = Annotated[str | None, Field(description=WIDGET_ID_FALLBACK_PARAM)]
 
 _CATALOG_OFFLOAD_MESSAGE = (
     "Full catalog stored at {uri} (read it as an MCP resource). Prefer "
@@ -71,17 +69,12 @@ def summarize_widget_catalog(data: Any) -> dict[str, Any]:
         )
     return {
         "widget_count": len(index),
-        "origins": [
-            {"origin": origin, "count": count}
-            for origin, count in origin_counts.items()
-        ],
+        "origins": [{"origin": origin, "count": count} for origin, count in origin_counts.items()],
         "widgets": index,
     }
 
 
-def register(
-    server: FastMCP, run: CommandRunner, offload_store: ResultOffloadStore
-) -> None:
+def register(server: FastMCP, run: CommandRunner, offload_store: ResultOffloadStore) -> None:
     @server.tool(
         description=describe_tool(
             "Fetch current data for one FINOS Workspace data source.",
@@ -92,12 +85,7 @@ def register(
         origin: Annotated[str, Field(description=ORIGIN_PARAM)],
         widget_id: Annotated[
             str,
-            Field(
-                description=(
-                    "Widget type identifier from list_available_widgets or the "
-                    "workspace snapshot."
-                )
-            ),
+            Field(description=("Widget type identifier from list_available_widgets or the workspace snapshot.")),
         ],
         data_args: Annotated[
             dict[str, Any] | None,
@@ -145,10 +133,7 @@ def register(
                 "Without filters the entire catalog is returned, which can be "
                 "hundreds of widgets — prefer a filter when you know the source."
             ),
-            (
-                "Large unfiltered results return a compact index plus a "
-                "result_ref resource with the full catalog."
-            ),
+            ("Large unfiltered results return a compact index plus a result_ref resource with the full catalog."),
         )
     )
     async def list_available_widgets(
@@ -217,12 +202,7 @@ def register(
         origin: Annotated[str, Field(description=ORIGIN_PARAM)],
         widget_id: Annotated[
             str,
-            Field(
-                description=(
-                    "Widget type identifier from list_available_widgets or the "
-                    "workspace snapshot."
-                )
-            ),
+            Field(description=("Widget type identifier from list_available_widgets or the workspace snapshot.")),
         ],
     ) -> ToolResponse:
         if not origin or not widget_id:
@@ -252,12 +232,7 @@ def register(
         origin: Annotated[str, Field(description=ORIGIN_PARAM)],
         widget_id: Annotated[
             str,
-            Field(
-                description=(
-                    "Widget type identifier from list_available_widgets or the "
-                    "workspace snapshot."
-                )
-            ),
+            Field(description=("Widget type identifier from list_available_widgets or the workspace snapshot.")),
         ],
         param_name: Annotated[
             str,
@@ -265,12 +240,7 @@ def register(
         ],
         data_args: Annotated[
             dict[str, Any] | None,
-            Field(
-                description=(
-                    "Object with the values required by the schema's "
-                    "options_lookup_params when present."
-                )
-            ),
+            Field(description=("Object with the values required by the schema's options_lookup_params when present.")),
         ] = None,
     ) -> ToolResponse:
         return await run(
@@ -300,9 +270,7 @@ def register(
         widget_id: WidgetIdFallback = None,
         dashboard_id: DashboardId = None,
     ) -> ToolResponse:
-        guard = require_widget_identifier(
-            "read_widget", widget_uuid=widget_uuid, widget_id=widget_id
-        )
+        guard = require_widget_identifier("read_widget", widget_uuid=widget_uuid, widget_id=widget_id)
         if guard is not None:
             return guard
         return await run(
@@ -319,41 +287,25 @@ def register(
             "Create one widget on a target dashboard.",
             "Use list_available_widgets and get_widget_schema first.",
             "Use add_generative_widget for text notes and HTML widgets.",
-            (
-                "Pass dry_run=true to validate and preview effective_params "
-                "without changing the workspace."
-            ),
+            ("Pass dry_run=true to validate and preview effective_params without changing the workspace."),
         )
     )
     async def create_widget(
         origin: Annotated[str, Field(description=ORIGIN_PARAM)],
         widget_id: Annotated[
             str,
-            Field(
-                description=(
-                    "Widget type identifier from list_available_widgets or the "
-                    "workspace snapshot."
-                )
-            ),
+            Field(description=("Widget type identifier from list_available_widgets or the workspace snapshot.")),
         ],
         dashboard_id: DashboardId = None,
         data_args: Annotated[
             dict[str, Any] | None,
             Field(
-                description=(
-                    "Object of data parameter values, as data_args_schema from "
-                    "get_widget_schema defines them."
-                )
+                description=("Object of data parameter values, as data_args_schema from get_widget_schema defines them.")
             ),
         ] = None,
         ui_args: Annotated[
             dict[str, Any] | None,
-            Field(
-                description=(
-                    "Object of UI config values, as ui_args_schema from "
-                    "get_widget_schema defines them."
-                )
-            ),
+            Field(description=("Object of UI config values, as ui_args_schema from get_widget_schema defines them.")),
         ] = None,
         dry_run: Annotated[
             bool | None,
@@ -393,16 +345,11 @@ def register(
             "Identify the widget by widget_uuid (preferred) or widget_id.",
             (
                 "Use read_widget first to inspect current params, and verify "
-                "effective_params in the response matches your intent."
+                "effective_params in the response matches your intent; a "
+                "plugin widget's settings come back as effective_ui_args.config."
             ),
-            (
-                "Config changes only: for placement (x, y, w, h, tab_id) use "
-                "update_widget_layout."
-            ),
-            (
-                "Pass dry_run=true to validate and preview effective_params "
-                "without changing the workspace."
-            ),
+            ("Config changes only: for placement (x, y, w, h, tab_id) use update_widget_layout."),
+            ("Pass dry_run=true to validate and preview effective_params without changing the workspace."),
         )
     )
     async def update_widget(
@@ -412,20 +359,12 @@ def register(
         data_args: Annotated[
             dict[str, Any] | None,
             Field(
-                description=(
-                    "Object of data parameter values, as data_args_schema from "
-                    "get_widget_schema defines them."
-                )
+                description=("Object of data parameter values, as data_args_schema from get_widget_schema defines them.")
             ),
         ] = None,
         ui_args: Annotated[
             dict[str, Any] | None,
-            Field(
-                description=(
-                    "Object of UI config values, as ui_args_schema from "
-                    "get_widget_schema defines them."
-                )
-            ),
+            Field(description=("Object of UI config values, as ui_args_schema from get_widget_schema defines them.")),
         ] = None,
         dry_run: Annotated[
             bool | None,
@@ -439,16 +378,13 @@ def register(
             ),
         ] = None,
     ) -> ToolResponse:
-        guard = require_widget_identifier(
-            "update_widget", widget_uuid=widget_uuid, widget_id=widget_id
-        )
+        guard = require_widget_identifier("update_widget", widget_uuid=widget_uuid, widget_id=widget_id)
         if guard is not None:
             return guard
         if data_args is None and ui_args is None:
             return invalid_request(
                 "update_widget",
-                "update_widget requires data_args and/or ui_args; call "
-                "get_widget_schema to see valid params.",
+                "update_widget requires data_args and/or ui_args; call get_widget_schema to see valid params.",
                 details={"required_one_of": ["data_args", "ui_args"]},
             )
         if has_layout_ui_args(ui_args):
@@ -505,9 +441,7 @@ def register(
         max_w: float | None = None,
         max_h: float | None = None,
     ) -> ToolResponse:
-        guard = require_widget_identifier(
-            "update_widget_layout", widget_uuid=widget_uuid, widget_id=widget_id
-        )
+        guard = require_widget_identifier("update_widget_layout", widget_uuid=widget_uuid, widget_id=widget_id)
         if guard is not None:
             return guard
         return await run(
@@ -539,9 +473,7 @@ def register(
         widget_id: WidgetIdFallback = None,
         dashboard_id: DashboardId = None,
     ) -> ToolResponse:
-        guard = require_widget_identifier(
-            "delete_widget", widget_uuid=widget_uuid, widget_id=widget_id
-        )
+        guard = require_widget_identifier("delete_widget", widget_uuid=widget_uuid, widget_id=widget_id)
         if guard is not None:
             return guard
         return await run(

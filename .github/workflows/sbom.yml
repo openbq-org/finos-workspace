@@ -9,6 +9,7 @@ on:
       - "**/package-lock.json"
       - "**/pyproject.toml"
       - "**/poetry.lock"
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}
@@ -23,13 +24,14 @@ env:
 jobs:
   sbom:
     name: Generate the SBOMs
+    if: github.ref == 'refs/heads/develop'
     runs-on: ubuntu-latest
     steps:
       - name: Get a token to push the SBOMs and open their pull request
         id: token
         uses: actions/create-github-app-token@v2
         with:
-          app-id: ${{ vars.SBOM_APP_ID }}
+          app-id: ${{ secrets.SBOM_APP_ID }}
           private-key: ${{ secrets.SBOM_APP_PRIVATE_KEY }}
           permission-contents: write
           permission-pull-requests: write

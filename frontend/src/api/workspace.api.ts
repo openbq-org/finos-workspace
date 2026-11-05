@@ -9,6 +9,7 @@ import { triggerCustomEvent } from "~/lib/utils";
 import {
   argsProblems,
   paramValueSchema,
+  pluginSettings,
   uiArgsSchema,
 } from "~/lib/utils/widgetArgsSchema";
 import { isStoredParamValue } from "~/lib/utils/widgetParams";
@@ -16,6 +17,8 @@ import {
   deserializeDashboardTabId,
   getDashboardInfo,
 } from "~/lib/utils/workspaceDashboard";
+import { cleanSettings } from "~/plugins/SettingsForm";
+import type { PluginInstanceStorage } from "~/plugins/types";
 
 type WidgetConfig = {
   dataArgs?: Record<string, unknown>;
@@ -310,6 +313,20 @@ function readWidget(
       : [],
   };
 
+  const config = pluginConfig(widget as WidgetT);
+  if (config) result.ui_args = { config };
+  if (widget.storage?.createdAt) result.created_at = widget.storage.createdAt;
+  if (widget.storage?.copiedFrom)
+    result.copied_from = {
+      widget_uuid: widget.storage.copiedFrom.widgetUuid,
+      name: widget.storage.copiedFrom.name,
+    };
+  if (widget.storage?.fromArtifact)
+    result.from_artifact = {
+      artifact_uuid: widget.storage.fromArtifact.artifactUuid,
+      name: widget.storage.fromArtifact.name,
+    };
+
   const widgetData = useCopilotDataStore.getState().getDashboardWidgetData(widgetUuid);
   if (widgetData?.data) {
     result.data = widgetData.data;
@@ -317,9 +334,23 @@ function readWidget(
     result.data = widget.storage.text;
   } else if (typeof widget.storage?.html === "string") {
     result.data = widget.storage.html;
+  } else if (
+    (widget.storage?.plugin as { data?: unknown } | undefined)?.data !== undefined
+  ) {
+    result.data = (widget.storage?.plugin as { data?: unknown }).data;
   }
 
   return result;
+}
+
+function pluginConfig(widget: WidgetT): Record<string, unknown> | undefined {
+  const settings = pluginSettings(widget);
+  return settings
+    ? cleanSettings(
+        settings,
+        (widget.storage?.plugin as PluginInstanceStorage | undefined)?.config,
+      )
+    : undefined;
 }
 
 async function updateWidget(
@@ -371,6 +402,7 @@ export {
   createWidget,
   deleteWidget,
   getWidgetDefinitionOrThrow,
+  pluginConfig,
   readDashboard,
   readWidget,
   updateDashboard,

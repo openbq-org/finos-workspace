@@ -17,6 +17,7 @@ const agGridStyles = join(dirname(dirname(dirname(require.resolve("ag-grid-commu
 
 const FILES = {
   "assets/icon.svg": join(root, "src/assets/icon.svg"),
+  "assets/autosize.svg": join(root, "src/assets/autosize.svg"),
   "backend/grid_server.py": join(root, "backend/grid_server.py"),
   "backend/ssrm.py": join(root, "backend/ssrm.py"),
   "backend/server.py": join(shared, "backend/server.py"),
