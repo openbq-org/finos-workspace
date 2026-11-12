@@ -10,7 +10,7 @@ The backend and admin tooling of FINOS Workspace.
 
 ## Getting started
 
-To run the whole stack, follow [Run the stack from source](../docs/tutorials/build-from-source/run-the-stack-from-source.md). See [DEVELOPMENT_SETUP.md](DEVELOPMENT_SETUP.md) for local development of the backend itself.
+To run the whole stack, follow [Run the stack from source](https://workspace.finos.org/tutorials/build-from-source/run-the-stack-from-source). See [DEVELOPMENT_SETUP.md](DEVELOPMENT_SETUP.md) for local development of the backend itself.
 
 ## Infrastructure
 
@@ -38,6 +38,6 @@ docker compose exec api python -m scripts.workspace_admin --help    # the root d
 | `provision check --config <file>`, `provision apply --config <file>` | An entity with its admins and users in one go; `provision sample` prints a config |
 | `plugin list`, `plugin rescan`, `plugin show <id>`, `plugin approve <id> <version> [--digest <d>] --acknowledge` | Widget plugins: discovery, the review (without `--acknowledge` it prints the review and approves nothing) and approval |
 | `plugin enable\|disable <id> (--entity <uuid> \| --all)`, `plugin grant\|ungrant <id> --role <uuid> [--widget <id>]` | Enable a plugin for organizations; a role that grants it is the only way to it |
-| `plugin revoke\|restore <id>`, `plugin override <id> ...`, `plugin secret set\|clear <id> <name>`, `plugin check-backend <id>`, `plugin events <id>`, `plugin reports <id>`, `plugin forget <id>` | The kill switch, the policy overrides, secrets (read without echo or from standard input), the backend's identity, the activity and blocked requests, and a plugin whose files are gone (the documentation site, Plugin lifecycle and administration) |
+| `plugin revoke\|restore <id>`, `plugin override <id> ...`, `plugin secret set\|clear <id> <name>`, `plugin check-backend <id>`, `plugin events <id>`, `plugin reports <id>`, `plugin forget <id>` | The kill switch, the policy overrides, secrets (read without echo or from standard input), the backend's identity, the activity and blocked requests, and a plugin whose files are gone ([Plugin lifecycle and administration](https://workspace.finos.org/reference/plugins/lifecycle) on the documentation site) |
 
 `--json` prints the outcome as JSON. A refused action prints why and exits with 1.

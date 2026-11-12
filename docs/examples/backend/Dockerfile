@@ -1,4 +1,4 @@
-FROM python:3.14.8-slim
+FROM python:3.14.8-slim@sha256:fbecd461fc72d21b2143c6eaba25143738079154a6d0ea3da3aec724f50eed4a
 
 ARG SQL_EXPLORER_VERSION
 ARG AG_GRID_VERSION
@@ -13,7 +13,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONPATH=/opt/plugins/sql-explorer/backend:/opt/plugins/ag-grid/backend
 
 COPY backend/requirements.txt /tmp/requirements.txt
-RUN pip install --no-compile -r /tmp/requirements.txt && rm /tmp/requirements.txt
+RUN pip install --no-compile --require-hashes -r /tmp/requirements.txt && rm /tmp/requirements.txt
 
 COPY sql-explorer/dist/sql-explorer/${SQL_EXPLORER_VERSION} /opt/plugins/sql-explorer
 COPY ag-grid/dist/ag-grid/${AG_GRID_VERSION} /opt/plugins/ag-grid

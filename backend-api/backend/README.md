@@ -111,7 +111,7 @@ provider has a revocation endpoint (Okta has one; Microsoft Entra has none), and
 `X-Microsoft-Id-Token` or `X-Okta-Id-Token`. A provider that issues no refresh token refuses
 the sign-in, and one that refuses a refresh token ends the session. Every call also carries
 `X-Workspace-Identity`, a short-lived token that the API signs and publishes the keys of at
-`<SELFURL>/.well-known/jwks.json`; see [Requests that a widget sends](../../docs/tutorials/build-a-backend/requests-from-a-widget.md).
+`<SELFURL>/.well-known/jwks.json`; see [Requests that a widget sends](https://workspace.finos.org/tutorials/build-a-backend/requests-from-a-widget).
 
 The API reaches users' MCP servers only at public internet addresses. An MCP server on a
 private network (an internal host, a compose service) has to be listed by host name in

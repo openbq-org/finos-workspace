@@ -17,11 +17,33 @@ In about 15 minutes you run FINOS Workspace on your own computer, write a small 
 
 - Docker with Docker Compose.
 - Python 3, to run the script that writes the configuration.
-- A clone of the [FINOS Workspace repository](https://github.com/finos-labs/workspace), for the Compose file and the configuration script.
-- A GitHub account that can read the packages of `finos-labs`, and a personal access token (classic) of that account with the `read:packages` scope. The images build on a base image that GitHub's container registry serves to logged-in readers only.
+- A clone of the [FINOS Workspace repository](https://github.com/finos-labs/finos-workspace), for the Compose file and the configuration script.
 - For the backend: Python 3.10 or later, or Node.js 22.18 or later. Use whichever language you prefer; every example on this site comes in both.
 
-## 1. Log in to the container registry
+## 1. Get the images
+
+FINOS Workspace runs from four images. Pull the released ones from Docker Hub, or build them from the clone:
+
+<Tabs groupId="images" queryString>
+<TabItem value="docker-hub" label="From Docker Hub" default>
+
+The released images are public, so you need no GitHub account and nothing is built. They are built for `linux/amd64`, so on a computer with Apple silicon Docker runs them through emulation, which is slower. You need Docker Compose 2.24 or later, which `docker compose version` shows.
+
+Write a file called `.env` in the root of the clone:
+
+```bash
+cat > .env <<'EOF'
+COMPOSE_FILE=docker-compose.yml:docker-compose.hub.yml
+WORKSPACE_VERSION=latest
+EOF
+```
+
+`COMPOSE_FILE` makes every `docker compose` command in this guide read `docker-compose.hub.yml` on top of `docker-compose.yml`. It replaces the build of each image with the image from Docker Hub. `WORKSPACE_VERSION` is the tag of the images: `latest` is the newest release, pre-releases included. To run another release, put its tag here, including the leading `v`.
+
+</TabItem>
+<TabItem value="repo" label="From the repo">
+
+You need a GitHub account that can read the packages of `finos-labs`, and a personal access token (classic) of that account with the `read:packages` scope. The images build on a base image that GitHub's container registry serves to logged-in readers only.
 
 Log in once, with your GitHub user name and the token. Docker keeps the login, so later builds need nothing more:
 
@@ -30,6 +52,9 @@ echo <token> | docker login ghcr.io -u <github-username> --password-stdin
 ```
 
 The next step builds the images from the clone. [Run the stack from source](../tutorials/build-from-source/run-the-stack-from-source.md) describes the same build in more detail.
+
+</TabItem>
+</Tabs>
 
 ## 2. Start FINOS Workspace
 
@@ -45,11 +70,28 @@ To let the Agent answer questions, open `agent/.env` and set `DEFAULT_MODEL` and
 
 Start the stack from the root of the clone:
 
+<Tabs groupId="images" queryString>
+<TabItem value="docker-hub" label="From Docker Hub" default>
+
+```bash
+docker compose up
+```
+
+Compose pulls the four images, about 250 MB, and starts the stack. The first start takes a few minutes.
+
+</TabItem>
+<TabItem value="repo" label="From the repo">
+
 ```bash
 docker compose up --build
 ```
 
-The first build takes several minutes. The stack is ready when `docker compose ps`, in a second terminal, shows the API as healthy. Then set the administrator's password. The command asks for it twice:
+The first build takes several minutes.
+
+</TabItem>
+</Tabs>
+
+The stack is ready when `docker compose ps`, in a second terminal, shows the API as healthy. Then set the administrator's password. The command asks for it twice:
 
 ```bash
 docker compose run --rm init python -m scripts.init_users --new-password <your-email>

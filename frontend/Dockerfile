@@ -24,7 +24,7 @@ RUN ["node", "scripts/check-runtime-config.ts"]
 RUN ["node", "node_modules/vite/bin/vite.js", "build", "--mode", "runtime"]
 RUN ["node", "-e", "require('node:fs').rmSync('dist/config.js')"]
 
-FROM alpine:3.24.2 AS nginx
+FROM alpine:3.24.2@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6 AS nginx
 
 ARG NGINX_VERSION=1.31.8
 ARG NGINX_SHA256=0652b760b3b772d2ec17b47c2fc15d9a95e6fe35cd5b877eadc1a62d9bc75af1

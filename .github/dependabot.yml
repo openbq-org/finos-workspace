@@ -1,0 +1,60 @@
+version: 2
+
+updates:
+  - package-ecosystem: github-actions
+    directories:
+      - /
+      - /.github/actions/*
+    target-branch: develop
+    schedule:
+      interval: weekly
+    groups:
+      github-actions:
+        patterns: ["*"]
+
+  - package-ecosystem: npm
+    directories:
+      - /agent
+      - /frontend
+      - /website
+      - /docs/examples/ag-grid
+      - /docs/examples/plotly-charts
+      - /docs/examples/reference-agent/typescript
+      - /docs/examples/reference-backend/typescript
+      - /docs/examples/sql-explorer
+    target-branch: develop
+    schedule:
+      interval: weekly
+    groups:
+      npm:
+        patterns: ["*"]
+        update-types: [minor, patch]
+
+  - package-ecosystem: pip
+    directories:
+      - /backend-api/backend
+      - /docs/examples/backend
+      - /docs/examples/reference-agent/python
+      - /docs/examples/reference-backend/python
+    target-branch: develop
+    schedule:
+      interval: weekly
+    groups:
+      pip:
+        patterns: ["*"]
+        update-types: [minor, patch]
+
+  - package-ecosystem: docker
+    directories:
+      - /agent
+      - /agent/tests/stub-model
+      - /backend-api/backend
+      - /docs/examples/backend
+      - /frontend
+    target-branch: develop
+    schedule:
+      interval: weekly
+    groups:
+      docker:
+        patterns: ["*"]
+        update-types: [minor, patch]

@@ -10,7 +10,9 @@
 
 <div align="center">
 
-**[Quick start](docs/quick-start/index.mdx)** · [Documentation](docs/index.mdx) · [Features](docs/features/index.md) · [Tutorials](docs/tutorials/index.md) · [Reference](docs/reference/index.md)
+**Documentation: [workspace.finos.org](https://workspace.finos.org)**
+
+[Quick start](https://workspace.finos.org/quick-start) · [Features](https://workspace.finos.org/features) · [Tutorials](https://workspace.finos.org/tutorials) · [Reference](https://workspace.finos.org/reference)
 
 </div>
 
@@ -24,9 +26,9 @@ FINOS Workspace is a web app that you run on your own servers. You connect your 
 
 ## Documentation
 
-Everything about FINOS Workspace is in the [documentation](docs/index.mdx): how to use it, how to connect your data, how to deploy it, and the full reference. This README gives only a short overview.
+Everything about FINOS Workspace is at **<https://workspace.finos.org>**: how to use it, how to connect your data, how to deploy it, and the full reference. This README gives only a short overview.
 
-To read the documentation as a website on your computer, see [website/README.md](website/README.md).
+The docs are built from the Markdown and MDX in [`docs/`](docs/) with Docusaurus in [`website/`](website/); to read them as a website on your computer, see [website/README.md](website/README.md).
 
 ## Quick start
 
@@ -54,28 +56,34 @@ Open <http://localhost:3000> and sign in with your email address and password.
 
 To let the AI agent answer questions, set `DEFAULT_MODEL` and your model provider's API key in `agent/.env`, then run `docker compose up -d`.
 
-The [Quick start guide](docs/quick-start/index.mdx) continues from here: you write a small data backend and put its first widget on a dashboard.
+To pull the images from Docker Hub instead of building them, which needs no token, follow the [Quick start guide](https://workspace.finos.org/quick-start?images=docker-hub).
+
+The [Quick start guide](https://workspace.finos.org/quick-start) continues from here: you write a small data backend and put its first widget on a dashboard.
+
+## Container images
+
+Each release publishes the four images on Docker Hub, built for `linux/amd64` and tagged with the release's tag: [`finos/workspace-backend`](https://hub.docker.com/r/finos/workspace-backend), [`finos/workspace-web`](https://hub.docker.com/r/finos/workspace-web), [`finos/workspace-agent`](https://hub.docker.com/r/finos/workspace-agent) and [`finos/workspace-agent-mcp`](https://hub.docker.com/r/finos/workspace-agent-mcp). [Deploy with Docker Compose](https://workspace.finos.org/tutorials/deploy/deploy-with-docker-compose) and [Deploy on Kubernetes](https://workspace.finos.org/tutorials/deploy/deploy-on-kubernetes) show how to run them.
 
 ## Features
 
 | Feature | What it does |
 |---|---|
-| [Dashboards](docs/features/dashboards/create-and-arrange-dashboards.md) | Arrange widgets on a page, group dashboards in folders, and export them. |
-| [Widgets](docs/features/widgets/widget-types.md) | Show tables, charts, Markdown, HTML, PDFs, news and embedded pages. |
-| [Data backends](docs/features/data-backends/connect-a-backend.md) | Connect your own data sources. |
-| [Apps](docs/features/apps/browse-and-open-apps.md) | Save a dashboard as an app that other people can open. |
-| [Agent](docs/features/agent/ask-the-agent-about-a-dashboard.md) | Ask questions about a dashboard, with your choice of model and tools. |
-| [MCP Companion](docs/features/mcp-companion/index.mdx) | Let AI tools, such as your IDE, build dashboards and apps for you. |
-| [Sharing](docs/features/sharing/share-a-dashboard.md) | Share dashboards with your team. |
-| [Administration](docs/features/administration/add-a-user.mdx) | Manage users, roles and access to data. |
-| [White label](docs/features/white-label/index.md) | Use your own name, logos, colors and fonts. |
-| [Plugins](docs/features/plugins/index.md) | Add new kinds of widgets. |
+| [Dashboards](https://workspace.finos.org/features/dashboards/create-and-arrange-dashboards) | Arrange widgets on a page, group dashboards in folders, and export them. |
+| [Widgets](https://workspace.finos.org/features/widgets/widget-types) | Show tables, charts, Markdown, HTML, PDFs, news and embedded pages. |
+| [Data backends](https://workspace.finos.org/features/data-backends/connect-a-backend) | Connect your own data sources. |
+| [Apps](https://workspace.finos.org/features/apps/browse-and-open-apps) | Save a dashboard as an app that other people can open. |
+| [Agent](https://workspace.finos.org/features/agent/ask-the-agent-about-a-dashboard) | Ask questions about a dashboard, with your choice of model and tools. |
+| [MCP Companion](https://workspace.finos.org/features/mcp-companion) | Let AI tools, such as your IDE, build dashboards and apps for you. |
+| [Sharing](https://workspace.finos.org/features/sharing/share-a-dashboard) | Share dashboards with your team. |
+| [Administration](https://workspace.finos.org/features/administration/add-a-user) | Manage users, roles and access to data. |
+| [White label](https://workspace.finos.org/features/white-label) | Use your own name, logos, colors and fonts. |
+| [Plugins](https://workspace.finos.org/features/plugins) | Add new kinds of widgets. |
 
-New to the terms? [Concepts](docs/concepts/index.md) explains what a dashboard, a widget, a backend and an app are. [All features](docs/features/index.md) has the complete list.
+New to the terms? [Concepts](https://workspace.finos.org/concepts) explains what a dashboard, a widget, a backend and an app are. [All features](https://workspace.finos.org/features) has the complete list.
 
 ## Tutorials
 
-To learn by doing, follow the [tutorials](docs/tutorials/index.md) in the documentation. They show how to build a data backend, write your own agent, build a widget plugin, deploy FINOS Workspace for your organization, and contribute to the project.
+To learn by doing, follow the [tutorials](https://workspace.finos.org/tutorials) in the documentation. They show how to build a data backend, write your own agent, build a widget plugin, deploy FINOS Workspace for your organization, and contribute to the project.
 
 ## Advisory Committee
 

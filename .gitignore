@@ -11,3 +11,4 @@ website/src/generated
 
 **/reference-data
 /widget-plugins/
+/.env

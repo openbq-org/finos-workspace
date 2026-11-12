@@ -27,6 +27,8 @@ from api.models import (
 )
 from routers import administration, app_helpers
 from routers.app.index import process_create_user, register_app_user
+from scripts.local_dev_admins import LOCAL_DEV_ADMIN_PASSWORDS
+from utilities.config import settings
 
 CONFIG_PATH = Path(__file__).parent / "cfgs"
 
@@ -95,7 +97,12 @@ class SetupConfig:
 
         if (user := result.scalars().first()) is None:
             logger.info(f"Creating admin: {admin_user.email} with is_superuser=1")
-            password = base.random_password()
+            seeded = (
+                LOCAL_DEV_ADMIN_PASSWORDS.get(admin_user.email)
+                if settings.MODE == "local"
+                else None
+            )
+            password = seeded or base.random_password()
             query = insert(User).values(
                 email=admin_user.email,
                 first_name=admin_user.first_name,
@@ -114,10 +121,16 @@ class SetupConfig:
                 [app_helpers.AGENT_USER_ROLE, app_helpers.SHARER_ROLE],
             )
             await self.db.commit()
-            show(
-                f"The administrator {admin_user.email} was created. Set their password with: "
-                f"python -m scripts.init_users --new-password {admin_user.email}"
-            )
+            if seeded:
+                show(
+                    f"The local-dev administrator {admin_user.email} was created "
+                    "with its known password (MODE=local only; never a deployment)."
+                )
+            else:
+                show(
+                    f"The administrator {admin_user.email} was created. Set their password with: "
+                    f"python -m scripts.init_users --new-password {admin_user.email}"
+                )
 
             return await self.create_admin(admin_user, permissions_uuid)
 

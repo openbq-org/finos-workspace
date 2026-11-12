@@ -82,7 +82,7 @@ const config: Config = {
         { type: "docSidebar", sidebarId: "concepts", label: "Concepts", position: "left" },
         { type: "docSidebar", sidebarId: "tutorials", label: "Tutorials", position: "left" },
         { type: "docSidebar", sidebarId: "reference", label: "Reference", position: "left" },
-        { href: "https://github.com/finos-labs/workspace", label: "GitHub", position: "right" },
+        { href: "https://github.com/finos-labs/finos-workspace", label: "GitHub", position: "right" },
       ],
     },
     footer: {

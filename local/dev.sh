@@ -93,6 +93,13 @@ Ready.
             has no password until you set it, once, typed twice and not shown. In this folder:
 
               docker compose run --rm init python -m scripts.init_users --new-password ${admin_email:-<your-email>}
+
+  Agents:   three extra MODE=local-only admins are also seeded with known passwords
+            so other agents can sign in alongside you:
+
+              workspace-dev1@example.com  WorkspaceDev!1
+              workspace-dev2@example.com  WorkspaceDev!2
+              workspace-dev3@example.com  WorkspaceDev!3
 READY
 }
 

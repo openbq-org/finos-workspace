@@ -302,7 +302,7 @@ python3 -m venv .venv
 ```
 
 ```bash
-.venv/bin/pip install -r ../backend/requirements.txt pytest==9.1.1 httpx2==2.13.1
+.venv/bin/pip install -r ../backend/requirements-test.txt
 ```
 
 ```bash

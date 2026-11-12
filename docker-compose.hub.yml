@@ -1,0 +1,30 @@
+services:
+  init:
+    build: !reset null
+    image: finos/workspace-backend:${WORKSPACE_VERSION:-latest}
+    platform: linux/amd64
+
+  api:
+    image: finos/workspace-backend:${WORKSPACE_VERSION:-latest}
+    pull_policy: missing
+    platform: linux/amd64
+
+  worker:
+    image: finos/workspace-backend:${WORKSPACE_VERSION:-latest}
+    pull_policy: missing
+    platform: linux/amd64
+
+  web:
+    build: !reset null
+    image: finos/workspace-web:${WORKSPACE_VERSION:-latest}
+    platform: linux/amd64
+
+  agent:
+    build: !reset null
+    image: finos/workspace-agent:${WORKSPACE_VERSION:-latest}
+    platform: linux/amd64
+
+  agent-mcp:
+    build: !reset null
+    image: finos/workspace-agent-mcp:${WORKSPACE_VERSION:-latest}
+    platform: linux/amd64

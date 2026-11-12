@@ -9,7 +9,7 @@ sidebar_position: 0
 
 Guides for people who change FINOS Workspace itself.
 
-Before you open a pull request, read [CONTRIBUTING.md](https://github.com/finos-labs/workspace/blob/develop/CONTRIBUTING.md) and the [code of conduct](https://github.com/finos-labs/workspace/blob/develop/CODE_OF_CONDUCT.md). To report a vulnerability, follow [SECURITY.md](https://github.com/finos-labs/workspace/blob/develop/SECURITY.md). [MAINTAINERS.md](https://github.com/finos-labs/workspace/blob/develop/MAINTAINERS.md) lists who reviews changes.
+Before you open a pull request, read [CONTRIBUTING.md](https://github.com/finos-labs/finos-workspace/blob/develop/CONTRIBUTING.md) and the [code of conduct](https://github.com/finos-labs/finos-workspace/blob/develop/CODE_OF_CONDUCT.md). To report a vulnerability, follow [SECURITY.md](https://github.com/finos-labs/finos-workspace/blob/develop/SECURITY.md). [MAINTAINERS.md](https://github.com/finos-labs/finos-workspace/blob/develop/MAINTAINERS.md) lists who reviews changes.
 
 | Task | Guide |
 |---|---|

@@ -11,7 +11,6 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=off \
     PIP_DISABLE_PIP_VERSION_CHECK=on \
     PIP_DEFAULT_TIMEOUT=100 \
-    POETRY_VERSION=2.3.2 \
     POETRY_VIRTUALENVS_IN_PROJECT=true \
     POETRY_VIRTUALENVS_OPTIONS_NO_PIP=true \
     POETRY_NO_INTERACTION=1 \
@@ -37,7 +36,8 @@ RUN arch="$(uname -m)" \
     && mkdir -p /opt && bsdtar -xzf "$tarball" -C /opt \
     && rm "$tarball"
 
-RUN /opt/python/bin/python3 -m venv /opt/poetry && /opt/poetry/bin/pip install "poetry==$POETRY_VERSION"
+COPY ./poetry-requirements.txt /tmp/poetry-requirements.txt
+RUN /opt/python/bin/python3 -m venv /opt/poetry && /opt/poetry/bin/pip install --require-hashes -r /tmp/poetry-requirements.txt && rm /tmp/poetry-requirements.txt
 
 WORKDIR $PYSETUP_PATH
 COPY ./pyproject.toml ./poetry.lock ./

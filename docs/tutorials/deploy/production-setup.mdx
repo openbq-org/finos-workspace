@@ -25,7 +25,7 @@ A few things to know:
 
 - The API and the worker are the same image. With no command, it starts the API. With the command `python base_workers.py`, it starts the worker.
 - The web app image runs as the user 101, and the other images run as the user 1000. None of them runs as root, except in the init step of the Compose guide, which [Lock down the containers](#lock-down-the-containers) explains.
-- [Build the images](../build-from-source/build-the-images.md) shows how to build all four images from the repository.
+- Each release publishes the four images on Docker Hub as `finos/workspace-backend`, `finos/workspace-web`, `finos/workspace-agent` and `finos/workspace-agent-mcp`, built for `linux/amd64`. [Build the images](../build-from-source/build-the-images.md) shows how to build all four from the repository instead.
 
 You also need:
 

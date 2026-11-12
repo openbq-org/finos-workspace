@@ -14,7 +14,7 @@ This guide follows [Production setup](production-setup.mdx), so read that page f
 - A Linux server with Docker Engine and the Docker Compose plugin.
 - Three DNS names on the same domain that point at the server. This guide uses `workspace.example.com` for the web app, `api.workspace.example.com` for the API and `agent.workspace.example.com` for the agent.
 - A reverse proxy on the server that handles TLS for those three names.
-- The four images in a registry that the server can pull from. [Build the images](../build-from-source/build-the-images.md) shows how to build and push them.
+- The four images. The server pulls them from Docker Hub as `finos/workspace-backend`, `finos/workspace-web`, `finos/workspace-agent` and `finos/workspace-agent-mcp`. To use images of your own, [build and push them](../build-from-source/build-the-images.md) to a registry that the server can pull from. The released images are built for `linux/amd64`, so use an x86-64 server: an arm64 server runs them through emulation.
 - The secrets from [Production setup](production-setup.mdx#the-secrets-you-need-to-create), and an API key for the agent's model.
 
 ## Write the files
@@ -36,10 +36,10 @@ workspace/
 `.env` holds the image names, the three addresses and the MySQL passwords. `compose.yaml` hands them to every service that needs them, so you set each one in one place:
 
 ```bash
-BACKEND_IMAGE=<registry>/workspace-backend:<version>
-WEB_IMAGE=<registry>/workspace-web:<version>
-AGENT_IMAGE=<registry>/workspace-agent:<version>
-AGENT_MCP_IMAGE=<registry>/workspace-agent-mcp:<version>
+BACKEND_IMAGE=finos/workspace-backend:<version>
+WEB_IMAGE=finos/workspace-web:<version>
+AGENT_IMAGE=finos/workspace-agent:<version>
+AGENT_MCP_IMAGE=finos/workspace-agent-mcp:<version>
 
 WEB_URL=https://workspace.example.com
 API_URL=https://api.workspace.example.com
@@ -48,6 +48,8 @@ AGENT_URL=https://agent.workspace.example.com
 MYSQL_ROOT_PASSWORD=<a random password>
 MYSQL_PASSWORD=<another random password>
 ```
+
+Set `<version>` to the tag of a [release](https://github.com/finos-labs/finos-workspace/releases), including its leading `v`. The four images of a release share that tag. Pin it: the tag `latest` moves to every new release, pre-releases included, so `docker compose pull` could upgrade you without your choosing to. If you build your own images, put your registry in front of the names, as in `<registry>/workspace-backend:<version>`.
 
 MySQL reads the two passwords once, on its very first start, when it creates the database. Changing them in `.env` after that does not change them in MySQL, and the init step then fails with `Access denied`. [Change a database password](#change-a-database-password) shows how to change one.
 

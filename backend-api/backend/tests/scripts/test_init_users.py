@@ -9,11 +9,14 @@ from sqlalchemy import delete, insert, select, update
 from api import base, models
 from scripts import init_users
 from scripts.init_users import Config, SetupConfig
+from scripts.local_dev_admins import LOCAL_DEV_ADMINS
 from tests.fixtures.base import _set_fk_checks
 
 ENTITY_NAME = "Initial Organization"
 ADMIN_EMAIL = "bootstrap-admin@example.com"
 OTHER_EMAIL = "bootstrap-member@example.com"
+DEV_EMAIL = LOCAL_DEV_ADMINS[0][0]
+DEV_PASSWORD = LOCAL_DEV_ADMINS[0][3]
 CREATED = re.compile(
     rf"^The administrator {re.escape(ADMIN_EMAIL)} was created\. Set their password with: "
     rf"python -m scripts\.init_users --new-password {re.escape(ADMIN_EMAIL)}$",
@@ -54,10 +57,11 @@ async def bootstrap_cleanup(db_session, monkeypatch, tmp_path):
             select(models.Entity.uuid).where(models.Entity.name == ENTITY_NAME)
         )
     ).scalar_one_or_none()
-    users = select(models.User.uuid).where(models.User.email.in_([ADMIN_EMAIL, OTHER_EMAIL]))
+    emails = [ADMIN_EMAIL, OTHER_EMAIL, DEV_EMAIL]
+    users = select(models.User.uuid).where(models.User.email.in_(emails))
     await db_session.execute(delete(models.Session).where(models.Session.user_uuid.in_(users)))
     await db_session.execute(
-        delete(models.User).where(models.User.email.in_([ADMIN_EMAIL, OTHER_EMAIL]))
+        delete(models.User).where(models.User.email.in_(emails))
     )
     if entity_uuid:
         roles = select(models.Role.uuid).where(models.Role.entity_uuid == entity_uuid)
@@ -297,6 +301,54 @@ async def test_a_new_password_is_only_for_an_administrator(
         )
     ).scalar_one()
     assert base.verify_password(member_password, member.password)
+
+
+@pytest.mark.asyncio
+async def test_local_dev_admin_is_created_with_its_known_password(
+    db_session, bootstrap_cleanup, capsys, monkeypatch
+):
+    monkeypatch.setattr(init_users.settings, "MODE", "local")
+    config = Config(
+        entity={"name": ENTITY_NAME},
+        admins=[
+            {"email": ADMIN_EMAIL, "first_name": "Bootstrap", "last_name": "Admin"},
+            {"email": DEV_EMAIL, "first_name": "Workspace", "last_name": "Dev 1"},
+        ],
+        users=[],
+    )
+
+    await SetupConfig(config, db_session).run()
+
+    dev = (
+        await db_session.execute(select(models.User).where(models.User.email == DEV_EMAIL))
+    ).scalar_one()
+    assert dev.is_superuser
+    assert base.verify_password(DEV_PASSWORD, dev.password)
+    out = capsys.readouterr().out
+    assert f"The local-dev administrator {DEV_EMAIL} was created" in out
+    assert DEV_PASSWORD not in out
+
+
+@pytest.mark.asyncio
+async def test_a_dev_email_in_non_local_mode_gets_a_random_password(
+    db_session, bootstrap_cleanup, capsys, monkeypatch
+):
+    monkeypatch.setattr(init_users.settings, "MODE", "production")
+    config = Config(
+        entity={"name": ENTITY_NAME},
+        admins=[
+            {"email": ADMIN_EMAIL, "first_name": "Bootstrap", "last_name": "Admin"},
+            {"email": DEV_EMAIL, "first_name": "Workspace", "last_name": "Dev 1"},
+        ],
+        users=[],
+    )
+
+    await SetupConfig(config, db_session).run()
+
+    dev = (
+        await db_session.execute(select(models.User).where(models.User.email == DEV_EMAIL))
+    ).scalar_one()
+    assert not base.verify_password(DEV_PASSWORD, dev.password)
 
 
 @pytest.mark.asyncio

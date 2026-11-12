@@ -15,7 +15,7 @@ This guide follows [Production setup](production-setup.mdx), so read that page f
 
 - A cluster, and `kubectl` that can reach it.
 - An ingress controller, and a TLS certificate for three names on the same domain. This guide uses `workspace.example.com` for the web app, `api.workspace.example.com` for the API and `agent.workspace.example.com` for the agent.
-- The four images in a registry that the cluster can pull from. [Build the images](../build-from-source/build-the-images.md) shows how to build and push them.
+- The four images. The cluster pulls them from Docker Hub as `finos/workspace-backend`, `finos/workspace-web`, `finos/workspace-agent` and `finos/workspace-agent-mcp`. Set `<version>` in the manifests below to the tag of a [release](https://github.com/finos-labs/finos-workspace/releases), including its leading `v`, and pin it rather than using `latest`, which moves to every new release, pre-releases included. The released images are built for `linux/amd64`, so run them on x86-64 nodes. To use images of your own, [build and push them](../build-from-source/build-the-images.md) to a registry that the cluster can pull from, and put that registry in front of the names.
 - The secrets from [Production setup](production-setup.mdx#the-secrets-you-need-to-create), and an API key for the agent's model.
 - MySQL and Valkey. Use your platform's managed services, or run them in the cluster with the manifests in [Run MySQL and Valkey in the cluster](#run-mysql-and-valkey-in-the-cluster).
 - A place for uploaded files that every API and worker pod can reach: a bucket, or a volume that pods on different nodes can mount at the same time.
@@ -281,7 +281,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: init
-          image: <registry>/workspace-backend:<version>
+          image: finos/workspace-backend:<version>
           command:
             - python
             - -c
@@ -381,7 +381,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: api
-          image: <registry>/workspace-backend:<version>
+          image: finos/workspace-backend:<version>
           ports:
             - name: http
               containerPort: 8000
@@ -457,7 +457,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: worker
-          image: <registry>/workspace-backend:<version>
+          image: finos/workspace-backend:<version>
           command: ["python", "base_workers.py"]
           envFrom:
             - configMapRef:
@@ -539,7 +539,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: agent
-          image: <registry>/workspace-agent:<version>
+          image: finos/workspace-agent:<version>
           ports:
             - name: http
               containerPort: 7777
@@ -609,7 +609,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: agent-mcp
-          image: <registry>/workspace-agent-mcp:<version>
+          image: finos/workspace-agent-mcp:<version>
           ports:
             - name: http
               containerPort: 8787
@@ -698,7 +698,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: web
-          image: <registry>/workspace-web:<version>
+          image: finos/workspace-web:<version>
           ports:
             - name: http
               containerPort: 8080

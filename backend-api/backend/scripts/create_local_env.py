@@ -8,6 +8,8 @@ import sys
 import time
 from pathlib import Path
 
+from scripts.local_dev_admins import LOCAL_DEV_ADMINS
+
 ENVS = Path(__file__).resolve().parent.parent / "envs"
 EXAMPLE = ENVS / ".env.example"
 TARGET = ENVS / ".env"
@@ -80,8 +82,8 @@ def settings(
     }
 
 
-def seed_config(entity_name: str, email: str) -> str:
-    return f"""\
+def seed_config(entity_name: str, email: str, extra_admins: bool = True) -> str:
+    primary = f"""\
 [entity]
 name = {json.dumps(entity_name)}
 
@@ -90,6 +92,18 @@ email = {json.dumps(email)}
 first_name = "FINOS Workspace"
 last_name = "Administrator"
 """
+    if not extra_admins:
+        return primary
+    extras = "".join(
+        f"""
+[[admins]]
+email = {json.dumps(dev_email)}
+first_name = {json.dumps(first)}
+last_name = {json.dumps(last)}
+"""
+        for dev_email, first, last, _password in LOCAL_DEV_ADMINS
+    )
+    return primary + extras
 
 
 def agent_secrets(jwt_secret: str, current_scope_secret: str = "") -> dict[str, str]:
@@ -139,6 +153,14 @@ def main(argv: list[str] | None = None) -> int:
         help="Write only scripts/cfgs/config.toml and leave the environment file alone",
     )
     parser.add_argument("--force", action="store_true", help="Overwrite existing files")
+    parser.add_argument(
+        "--no-extra-admins",
+        action="store_true",
+        help=(
+            "Do not seed the three extra local-dev admins "
+            "(workspace-dev1..dev3@example.com) with known passwords"
+        ),
+    )
     args = parser.parse_args(argv)
 
     example, target = (SQLITE_EXAMPLE, SQLITE_TARGET) if args.sqlite else (EXAMPLE, TARGET)
@@ -156,7 +178,8 @@ def main(argv: list[str] | None = None) -> int:
         values = secrets_for(**generated) if args.sqlite else settings(**generated)
         target.write_text(render(example.read_text(), values))
     CONFIG.parent.mkdir(parents=True, exist_ok=True)
-    CONFIG.write_text(seed_config(args.entity_name, args.admin_email))
+    extra_admins = not args.no_extra_admins
+    CONFIG.write_text(seed_config(args.entity_name, args.admin_email, extra_admins=extra_admins))
     if not (args.config_only or args.sqlite) and not USER_CREATE.exists():
         USER_CREATE.write_text("{}\n")
     agent = None if args.config_only or args.sqlite else write_agent_env(generated["jwt_secret"])
@@ -166,6 +189,14 @@ def main(argv: list[str] | None = None) -> int:
         "Set it with: docker compose run --rm init python -m scripts.init_users "
         f"--new-password {args.admin_email}\n"
     )
+    if extra_admins:
+        sys.stdout.write(
+            "The first start also creates three local-dev admins with known passwords "
+            "so other agents can sign in at the same time; these are for MODE=local only, "
+            "never a deployment:\n"
+        )
+        for dev_email, _first, _last, password in LOCAL_DEV_ADMINS:
+            sys.stdout.write(f"  {dev_email}  {password}\n")
     if agent:
         sys.stdout.write(f"Set the agent's secrets in {agent}; set DEFAULT_MODEL and that provider's key there too.\n")
     return 0

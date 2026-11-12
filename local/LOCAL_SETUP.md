@@ -2,7 +2,7 @@
 
 Everything for working on the app on your own machine lives in this folder. One command starts the frontend, the backend API and its worker, MySQL and Valkey, and code edits show up without restarting anything.
 
-To run the built images instead (web app and API, as a user would), use `docker-compose.yml` at the repository root; [Run the stack from source](../docs/tutorials/build-from-source/run-the-stack-from-source.md) explains it. The two stacks use port 8000, so run one at a time.
+To run the built images instead (web app and API, as a user would), use `docker-compose.yml` at the repository root; [Run the stack from source](https://workspace.finos.org/tutorials/build-from-source/run-the-stack-from-source) explains it. The two stacks use port 8000, so run one at a time.
 
 ## Before you start
 
