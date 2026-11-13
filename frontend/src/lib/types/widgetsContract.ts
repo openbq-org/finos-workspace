@@ -225,6 +225,13 @@ const TextParam = z.strictObject({
       description: "The value is code in this language, edited in a code editor",
     })
     .optional(),
+  bodyRoot: z
+    .boolean()
+    .meta({
+      description:
+        "With `in: \"body\"`: the value is a JSON object whose keys go at the top of the body instead of under the param's name, for a backend that takes a client's request as the whole body",
+    })
+    .optional(),
 });
 const TabsParam = z.strictObject({
   ...ParamCommon,

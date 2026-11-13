@@ -209,6 +209,45 @@ describe("values (4.3)", () => {
     expect(new URL(request.url).searchParams.get("qn")).toBe("4");
   });
 
+  it("puts a bodyRoot param's JSON object at the top of the body, next to the other body params", () => {
+    const params = [
+      { paramName: "gridState", type: "text", in: "body", bodyRoot: true },
+      { paramName: "desk", type: "text", in: "body" },
+    ] as Partial<ParamDef>[];
+    const request = post(params, {
+      gridState: JSON.stringify({
+        startRow: 0,
+        endRow: 100,
+        sortModel: [{ colId: "qty", sort: "desc" }],
+        filterModel: { desk: { type: "equals" } },
+      }),
+      desk: "FX",
+    });
+    expect(JSON.parse(request.body ?? "")).toEqual({
+      startRow: 0,
+      endRow: 100,
+      sortModel: [{ colId: "qty", sort: "desc" }],
+      filterModel: { desk: { type: "equals" } },
+      desk: "FX",
+    });
+    // An empty value adds nothing.
+    expect(JSON.parse(post(params, { gridState: "" }).body ?? "{}")).toEqual({});
+  });
+
+  it("refuses a bodyRoot value that is not a JSON object", () => {
+    const params = [
+      { paramName: "gridState", type: "text", in: "body", bodyRoot: true },
+    ] as Partial<ParamDef>[];
+    for (const value of ["not json", "[1, 2]", "42"])
+      expect(
+        problems(
+          buildWidgetRequest(
+            widget("/x", params, { gridState: value }, { method: "POST" }),
+          ),
+        )[0].message,
+      ).toMatch(/must be a JSON object/);
+  });
+
   it("resolves $currentDate modifiers", () => {
     const request = sent(
       buildWidgetRequest(

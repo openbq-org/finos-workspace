@@ -69,6 +69,10 @@ A write to `config` or `config:<key>` needs the permission `core:config:write`. 
 
 A backend widget that sets `raw` has a button that shows its rows instead of its view. When the widget has no `data.rawType`, or when the user may not use the plugin that `rawType` names, the module itself shows the rows. In that case `data` holds the rows, usually as an array of objects, and the frame starts again with them. It starts again when the user switches back to the view. The module should show the rows as a table, or it should say that it cannot show them. The AI agent receives the rows in either case, so a widget with `raw` does not need to provide `copilotContext`. [Widget rows](../protocols/raw-rows.md) describes the feature.
 
+### File answers
+
+A handle whose `response` has `accepts: "file"` gets its endpoint's answer as a file instead of JSON, for a widget that shows a CSV, a workbook or a Parquet file. The host reads the answer's bytes and sets the `data` trait to `{ file: { name, mime, base64 } }`: the name from the answer's `Content-Disposition`, else from the last segment of the URL, kept to letters, digits and `_ . - ( )`; the media type from `Content-Type`; and the bytes in base64. An answer larger than 25 MB is an error on the card. The endpoint's `dataKey` does not apply to a file.
+
 ## Exports
 
 The `initialize` function may return an object instead of a cleanup function. The host calls the members of that object:

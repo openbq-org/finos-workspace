@@ -118,6 +118,7 @@ const ParamValueSchema = z.discriminatedUnion("type", [
     type: z.literal("text"),
     value: z.string().nullish(),
     language: z.enum(EditorLanguages, unionErrorMap("Unsupported language")).nullish(),
+    bodyRoot: z.boolean().optional(),
   }).meta({ id: "TextParamDef" }),
   ParamDefSchemaBase.extend({
     type: z.literal("tabs"),

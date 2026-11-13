@@ -35,6 +35,7 @@ A param accepts these keys and no others; `paramName` and `type` are required, a
 | `value` | all but `form` | depends on `type` | The default value. For `date`: The default: a date, `YYYY-MM-DD`, or `$currentDate` with a modifier such as `$currentDate-1M`. For `number`: The default: a number, or a string of digits. For `endpoint`: The default: an option's value, or a list of them for multiSelect (or a comma-separated string) |
 | `multiple` | `text` | `true` or `false` | Several values can be entered, sent like multiSelect |
 | `language` | `text` | `sql`, `javascript`, `python`, `json`, `html`, `css`, `markdown`, `xml`, `text` | The value is code in this language, edited in a code editor |
+| `bodyRoot` | `text` | `true` or `false` | With `in: "body"`: the value is a JSON object whose keys go at the top of the body instead of under the param's name, for a backend that takes a client's request as the whole body |
 | `optionsEndpoint` | `endpoint` | text, at most 2,048 characters | A path or an absolute URL with no `?` and no `#`, which answers with the choices as a list of strings or `{ label, value, extraInfo }` |
 | `optionsMethod` | `endpoint` | `GET`, `POST` | How the options are requested: GET (the default) or POST |
 | `optionsParams` | `endpoint` | object | Values for the options request: a `{name}` placeholder of optionsEndpoint takes one, the rest go in the query (GET) or a JSON body (POST). `$name` is the current value of the param `name` |

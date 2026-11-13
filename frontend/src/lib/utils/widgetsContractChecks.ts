@@ -131,6 +131,25 @@ export function contractProblems(
     problems.push(...referenceProblems(param.optionsParams, declared, pointer));
   }
 
+  const bodyRoots = requestParams.filter(({ param }) => param.bodyRoot === true);
+  for (const { param, pointer } of bodyRoots) {
+    if (param.in !== "body")
+      problems.push({
+        pointer: `${pointer}/bodyRoot`,
+        message: `\`${String(param.paramName)}\` puts its keys at the top of the body, so it needs \`in: "body"\``,
+      });
+    if (param.multiSelect || param.multiple)
+      problems.push({
+        pointer: `${pointer}/bodyRoot`,
+        message: `\`${String(param.paramName)}\` fills the body with one JSON object, so it takes one value`,
+      });
+  }
+  if (bodyRoots.length > 1)
+    problems.push({
+      pointer: `${bodyRoots[1].pointer}/bodyRoot`,
+      message: "only one param can fill the top of the body (`bodyRoot`)",
+    });
+
   const fileSelectors = params.filter(({ param }) =>
     (param.roles as string[] | undefined)?.includes("fileSelector"),
   );

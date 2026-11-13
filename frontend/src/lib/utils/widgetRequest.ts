@@ -177,6 +177,29 @@ function startUrl(href: string, problems: RequestProblem[]): URL {
   return url;
 }
 
+function isBodyRoot(param: AnyParam | undefined): boolean {
+  return (
+    !!param &&
+    param.type === "text" &&
+    (param as { bodyRoot?: boolean }).bodyRoot === true
+  );
+}
+
+/** A `bodyRoot` param's value: a JSON object, given as one or as its text. */
+function bodyObject(value: unknown): Record<string, unknown> | null {
+  let parsed = value;
+  if (typeof value === "string") {
+    try {
+      parsed = JSON.parse(value);
+    } catch {
+      return null;
+    }
+  }
+  return parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)
+    ? (parsed as Record<string, unknown>)
+    : null;
+}
+
 function place(
   param: AnyParam | undefined,
   name: string,
@@ -200,6 +223,15 @@ function place(
   if (at === "body" && target.method === "GET")
     return invalid(`\`${name}\` goes in the body, which needs the method POST`);
 
+  if (at === "body" && isBodyRoot(param)) {
+    const object = bodyObject(value);
+    if (!object)
+      return invalid(
+        `\`${name}\` must be a JSON object, whose keys go at the top of the body`,
+      );
+    Object.assign(target.body, object);
+    return;
+  }
   const serialized = serialize(param, value, at);
   if (!serialized.ok) return invalid(serialized.message);
   if (at === "body") {

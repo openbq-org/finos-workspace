@@ -367,7 +367,13 @@ class ModelSpec(BaseModel):
 class Response(BaseModel):
     model_config = closed
 
-    accepts: Literal["json"] = Field(default="json", description="The kind of answer that the backend returns.")
+    accepts: Literal["json", "file"] = Field(
+        default="json",
+        description=(
+            "The kind of answer that the backend returns: `json`, or `file`, which the host reads as bytes and gives "
+            "the module as `{ file: { name, mime, base64 } }`."
+        ),
+    )
     description: Sentence = Field(default="", description="What the backend returns.")
     schema_: dict[str, Any] | None = Field(default=None, alias="schema", description="A JSON Schema of the answer.")
 

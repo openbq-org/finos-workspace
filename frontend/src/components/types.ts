@@ -228,6 +228,8 @@ interface BaseParamDef<PT extends ParamType = "text"> {
 interface TextParamDef extends BaseParamDef<"text"> {
   type: "text";
   value?: string;
+  /** With `in: "body"`: the value is a JSON object whose keys go at the top of the body. */
+  bodyRoot?: boolean;
 }
 
 interface DateParamDef extends BaseParamDef<"date"> {

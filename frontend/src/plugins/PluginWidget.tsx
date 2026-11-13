@@ -56,6 +56,7 @@ import {
 } from "./authority";
 import { BundleIntegrityError, loadAsset } from "./bundle";
 import { validateDefinition } from "./definition";
+import { fileAnswerOf } from "./fileAnswer";
 import {
   ACTION_GRANT_MS,
   MAX_CLIPBOARD_BYTES,
@@ -231,7 +232,17 @@ function PluginWidgetBody({
   const answer = useJsonData(
     {
       request,
-      responseCb: async (response, resolve) => {
+      responseCb: async (response, resolve, reject) => {
+        if (handle?.response.accepts === "file") {
+          try {
+            resolve(
+              await fileAnswerOf(response, request?.ok ? request.request.url : ""),
+            );
+          } catch (error) {
+            reject(error);
+          }
+          return;
+        }
         const json = await response.json();
         resolve(dataKey ? get(json, dataKey, json) : json);
       },

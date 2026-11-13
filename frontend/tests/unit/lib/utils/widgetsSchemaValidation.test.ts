@@ -219,3 +219,27 @@ describe("a template's plugin configuration (WIDGETS-JSON 3.10)", () => {
     ]);
   });
 });
+
+describe("bodyRoot", () => {
+  const post = (params: Record<string, unknown>[]) => ({
+    ...ok,
+    method: "POST",
+    params,
+  });
+
+  it("takes a text param in the body whose JSON object fills the top of the body", () => {
+    expect(
+      problems(
+        post([
+          {
+            paramName: "gridState",
+            type: "text",
+            in: "body",
+            bodyRoot: true,
+            show: false,
+          },
+        ]),
+      ),
+    ).toEqual([]);
+  });
+});

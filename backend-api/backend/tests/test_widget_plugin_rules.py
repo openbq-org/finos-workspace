@@ -126,6 +126,17 @@ class TestManifest:
     def test_a_valid_manifest(self):
         Manifest.model_validate(manifest())
 
+    @pytest.mark.parametrize(("accepts", "valid"), [("json", True), ("file", True), ("binary", False), ("text", False)])
+    def test_a_handle_accepts_json_or_a_file(self, accepts, valid):
+        base = manifest()
+        widget = {**base["contributes"]["widgets"][0], "handles": [{"type": "plotly", "response": {"accepts": accepts}}]}
+        candidate = {**base, "contributes": {**base["contributes"], "widgets": [widget]}}
+        if valid:
+            assert Manifest.model_validate(candidate).contributes.widgets[0].handles[0].response.accepts == accepts
+        else:
+            with pytest.raises(ValueError):
+                Manifest.model_validate(candidate)
+
     @pytest.mark.parametrize(
         "change",
         [
